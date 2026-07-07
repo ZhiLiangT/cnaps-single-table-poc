@@ -155,6 +155,7 @@ public class CnapsVoucherService {
     }
 
     private void validateCreate(VoucherCreateRequest request) {
+        requireRequiredField(request.businessType(), "businessType");
         requireRequiredField(request.accountPart1(), "accountPart1");
         requireRequiredField(request.accountPart2(), "accountPart2");
         requireRequiredField(request.accountPart3(), "accountPart3");
@@ -162,6 +163,11 @@ public class CnapsVoucherService {
         requireRequiredField(request.payeeName(), "payeeName");
         requireRequiredField(request.priority(), "priority");
         requireRequiredField(request.amount(), "amount");
+        requireRequiredField(request.feeChargeMode(), "feeChargeMode");
+        requireRequiredField(request.sendMode(), "sendMode");
+        requireRequiredField(request.debitMode(), "debitMode");
+        requireRequiredField(request.faxFlag(), "faxFlag");
+        requireRequiredField(request.systemType(), "systemType");
 
         BigDecimal amount = parseAmount(request.amount());
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {

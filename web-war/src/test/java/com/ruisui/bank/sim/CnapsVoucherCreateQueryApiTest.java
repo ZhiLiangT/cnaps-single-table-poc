@@ -163,6 +163,38 @@ class CnapsVoucherCreateQueryApiTest {
     }
 
     @Test
+    void missingBusinessTypeReturnsRequiredFieldError() throws Exception {
+        String body = validCreateBody("5600.00").replace("\"businessType\":\"02102\",", "");
+
+        mockMvc.perform(post("/api/cnaps/vouchers")
+                .header("requestId", "REQ-CREATE-013")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("2001"));
+    }
+
+    @Test
+    void missingFeeChargeModeReturnsRequiredFieldError() throws Exception {
+        String body = validCreateBody("5600.00").replace("\"feeChargeMode\":\"1\",", "");
+
+        mockMvc.perform(post("/api/cnaps/vouchers")
+                .header("requestId", "REQ-CREATE-014")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("2001"));
+    }
+
+    @Test
     void invalidPriorityReturnsDictionaryError() throws Exception {
         String body = validCreateBody("5600.00").replace("\"priority\":\"NORM\"", "\"priority\":\"FAST\"");
 

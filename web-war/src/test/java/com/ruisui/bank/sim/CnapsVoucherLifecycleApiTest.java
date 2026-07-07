@@ -46,6 +46,36 @@ class CnapsVoucherLifecycleApiTest {
     }
 
     @Test
+    void makerSelfReviewAfterApprovalReturnsThreeZeroZeroFiveForReviewPass() throws Exception {
+        String billId = createVoucher("REQ-LIFE-014", "77210021");
+
+        reviewPass(billId, "REQ-LIFE-015", "77210022").andExpect(status().isOk());
+
+        reviewPass(billId, "REQ-LIFE-016", "77210021")
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("3005"));
+    }
+
+    @Test
+    void makerSelfReviewAfterApprovalReturnsThreeZeroZeroFiveForReviewReturn() throws Exception {
+        String billId = createVoucher("REQ-LIFE-017", "77210021");
+
+        reviewPass(billId, "REQ-LIFE-018", "77210022").andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/cnaps/vouchers/{billId}/review-return", billId)
+                .header("requestId", "REQ-LIFE-019")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"rejectReason\":\"自审退回\"}"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("3005"));
+    }
+
+    @Test
     void reviewReturnStoresReasonAndUpdateResubmitsPendingReview() throws Exception {
         String billId = createVoucher("REQ-LIFE-006", "77210021");
 

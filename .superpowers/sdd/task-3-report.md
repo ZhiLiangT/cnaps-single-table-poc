@@ -92,3 +92,46 @@ Result:
 ## Concerns
 
 None at the moment.
+
+---
+
+## Fix Append: Self-Review Precedence
+
+### Root Cause
+
+`reviewPass` and `reviewReturn` checked voucher status before checking whether the maker was attempting to review their own voucher. When a maker retried either review action after the voucher had already transitioned out of `10_PENDING_REVIEW`, the API returned `3004` instead of the spec-required `3005`.
+
+### Fix
+
+Moved `requireNotSelfReview(...)` ahead of `requirePendingReview(...)` in both review methods.
+
+### Regression Tests Added
+
+- maker self-review after approval returns `3005` for `review-pass`
+- maker self-review after approval returns `3005` for `review-return`
+
+### Command / Output Summary
+
+Focused repro before fix:
+```bash
+mvn -f web-war/pom.xml test -Dtest=CnapsVoucherLifecycleApiTest
+```
+
+Observed:
+- both new regression tests failed with `409` and `respCode=3004`
+
+Focused verification after fix:
+```bash
+mvn -f web-war/pom.xml test -Dtest=CnapsVoucherLifecycleApiTest
+```
+
+Observed:
+- `6` tests passed
+
+Full regression after fix:
+```bash
+mvn -f web-war/pom.xml test
+```
+
+Observed:
+- `18` tests passed

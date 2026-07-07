@@ -123,8 +123,8 @@ public class CnapsVoucherService {
 
     public VoucherResponse reviewPass(HeaderContext context, String billId, ReviewPassRequest request) {
         CnapsBillPoc entity = loadLifecycleEntity(context, billId);
-        requirePendingReview(entity);
         requireNotSelfReview(context, entity);
+        requirePendingReview(entity);
 
         entity.setStatus(VoucherStatus.REVIEW_APPROVED.code());
         entity.setLastAction(LastAction.REVIEW_PASS.code());
@@ -140,8 +140,8 @@ public class CnapsVoucherService {
     public VoucherResponse reviewReturn(HeaderContext context, String billId, ReviewReturnRequest request) {
         requireRejectReason(request.rejectReason());
         CnapsBillPoc entity = loadLifecycleEntity(context, billId);
-        requirePendingReview(entity);
         requireNotSelfReview(context, entity);
+        requirePendingReview(entity);
 
         entity.setStatus(VoucherStatus.REVIEW_REJECTED.code());
         entity.setLastAction(LastAction.REVIEW_RETURN.code());

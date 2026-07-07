@@ -43,7 +43,7 @@ public class CnapsBillPoc {
     @Column(name = "PAYEE_NAME", nullable = false, length = 128)
     private String payeeName;
 
-    @Column(name = "PRIORITY", length = 16)
+    @Column(name = "PRIORITY", length = 12)
     private String priority;
 
     @Column(name = "RECEIVE_BANK_NO", length = 32)
@@ -58,16 +58,16 @@ public class CnapsBillPoc {
     @Column(name = "AMOUNT", nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "DEBIT_MODE", length = 16)
+    @Column(name = "DEBIT_MODE", length = 8)
     private String debitMode;
 
-    @Column(name = "FEE_AMOUNT", precision = 19, scale = 2)
+    @Column(name = "FEE_AMOUNT", precision = 18, scale = 2)
     private BigDecimal feeAmount;
 
-    @Column(name = "FEE_CHARGE_MODE", length = 16)
+    @Column(name = "FEE_CHARGE_MODE", length = 8)
     private String feeChargeMode;
 
-    @Column(name = "SEND_MODE", length = 16)
+    @Column(name = "SEND_MODE", length = 8)
     private String sendMode;
 
     @Column(name = "FAX_FLAG", length = 1)
@@ -105,6 +105,12 @@ public class CnapsBillPoc {
 
     @Column(name = "LAST_ACTION_TIME")
     private OffsetDateTime lastActionAt;
+
+    @Column(name = "LAST_OPERATOR_NO", length = 16)
+    private String lastOperatorNo;
+
+    @Column(name = "LAST_REQUEST_ID", length = 32)
+    private String lastRequestId;
 
     @Column(name = "REJECT_REASON", length = 200)
     private String rejectReason;
@@ -373,6 +379,22 @@ public class CnapsBillPoc {
 
     public void setLastActionAt(OffsetDateTime lastActionAt) {
         this.lastActionAt = lastActionAt;
+    }
+
+    public String getLastOperatorNo() {
+        return lastOperatorNo;
+    }
+
+    public void setLastOperatorNo(String lastOperatorNo) {
+        this.lastOperatorNo = lastOperatorNo;
+    }
+
+    public String getLastRequestId() {
+        return lastRequestId;
+    }
+
+    public void setLastRequestId(String lastRequestId) {
+        this.lastRequestId = lastRequestId;
     }
 
     public String getRejectReason() {

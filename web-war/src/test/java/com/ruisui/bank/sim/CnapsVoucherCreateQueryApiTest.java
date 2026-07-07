@@ -49,6 +49,8 @@ class CnapsVoucherCreateQueryApiTest {
             .andExpect(jsonPath("$.data.billId").value(created.billId()))
             .andExpect(jsonPath("$.data.status").value("10_PENDING_REVIEW"))
             .andExpect(jsonPath("$.data.lastAction").value("CREATE"))
+            .andExpect(jsonPath("$.data.lastOperatorNo").value("77210021"))
+            .andExpect(jsonPath("$.data.lastRequestId").value("REQ-CREATE-001"))
             .andExpect(jsonPath("$.data.payeeAccountNo").value("622200000000000001"));
     }
 

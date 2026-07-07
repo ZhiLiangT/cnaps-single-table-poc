@@ -40,6 +40,8 @@ public class VoucherMapper {
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         entity.setLastActionAt(now);
+        entity.setLastOperatorNo(context.operatorNo());
+        entity.setLastRequestId(context.requestId());
         return entity;
     }
 
@@ -96,6 +98,8 @@ public class VoucherMapper {
             entity.getRemark(),
             entity.getOperatorNo(),
             entity.getBranchNo(),
+            entity.getLastOperatorNo(),
+            entity.getLastRequestId(),
             entity.getWorkDate() == null ? null : DATE_FORMAT.format(entity.getWorkDate()),
             entity.getVersionNo(),
             entity.getRejectReason(),

@@ -27,7 +27,9 @@ class CnapsVoucherLifecycleApiTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.respMsg").value("操作已成功"))
             .andExpect(jsonPath("$.data.checkerNo").value("77210022"))
-            .andExpect(jsonPath("$.data.status").value("20_REVIEW_APPROVED"));
+            .andExpect(jsonPath("$.data.status").value("20_REVIEW_APPROVED"))
+            .andExpect(jsonPath("$.data.lastOperatorNo").value("77210022"))
+            .andExpect(jsonPath("$.data.lastRequestId").value("REQ-LIFE-002"));
 
         reviewPass(billId, "REQ-LIFE-003", "77210022")
             .andExpect(status().isConflict())
@@ -116,7 +118,9 @@ class CnapsVoucherLifecycleApiTest {
                 .content("{\"deleteReason\":\"录入有误\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("40_DELETED"))
-            .andExpect(jsonPath("$.data.deleteOperatorNo").value("77210021"));
+            .andExpect(jsonPath("$.data.deleteOperatorNo").value("77210021"))
+            .andExpect(jsonPath("$.data.lastOperatorNo").value("77210021"))
+            .andExpect(jsonPath("$.data.lastRequestId").value("REQ-LIFE-010"));
 
         String approvedBillId = createVoucher("REQ-LIFE-011", "77210021");
         reviewPass(approvedBillId, "REQ-LIFE-012", "77210022").andExpect(status().isOk());

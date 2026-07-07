@@ -104,3 +104,40 @@ mvn -f web-war/pom.xml test
 ```
 
 Both commands passed after the mapping and test updates.
+
+## Second Fix Append
+
+Re-review parity fixes were applied for the remaining Oracle columns and response visibility fields.
+
+### What changed
+
+- Added `LAST_OPERATOR_NO` and `LAST_REQUEST_ID` to [web-war/src/main/java/com/ruisui/bank/sim/persistence/CnapsBillPoc.java](file:///D:/Project/ruisui/.worktrees/cnaps-single-table-poc/web-war/src/main/java/com/ruisui/bank/sim/persistence/CnapsBillPoc.java).
+- Updated lifecycle writes in [web-war/src/main/java/com/ruisui/bank/sim/service/CnapsVoucherService.java](file:///D:/Project/ruisui/.worktrees/cnaps-single-table-poc/web-war/src/main/java/com/ruisui/bank/sim/service/CnapsVoucherService.java) so create, update, delete, review pass, and review return persist the current operator/request alongside `LAST_ACTION_TIME`.
+- Exposed `lastOperatorNo` and `lastRequestId` in [web-war/src/main/java/com/ruisui/bank/sim/api/dto/VoucherResponse.java](file:///D:/Project/ruisui/.worktrees/cnaps-single-table-poc/web-war/src/main/java/com/ruisui/bank/sim/api/dto/VoucherResponse.java) and mapped them in [web-war/src/main/java/com/ruisui/bank/sim/service/VoucherMapper.java](file:///D:/Project/ruisui/.worktrees/cnaps-single-table-poc/web-war/src/main/java/com/ruisui/bank/sim/service/VoucherMapper.java).
+- Strengthened [web-war/src/test/java/com/ruisui/bank/sim/DeploymentArtifactTest.java](file:///D:/Project/ruisui/.worktrees/cnaps-single-table-poc/web-war/src/test/java/com/ruisui/bank/sim/DeploymentArtifactTest.java) to assert:
+  - `LAST_OPERATOR_NO` and `LAST_REQUEST_ID` exist in the entity and DDL
+  - `PRIORITY`, `DEBIT_MODE`, `FEE_AMOUNT`, `FEE_CHARGE_MODE`, and `SEND_MODE` align with the Oracle contract
+  - `VoucherResponse` now includes `lastOperatorNo` and `lastRequestId`
+- Added API assertions in:
+  - [web-war/src/test/java/com/ruisui/bank/sim/CnapsVoucherCreateQueryApiTest.java](file:///D:/Project/ruisui/.worktrees/cnaps-single-table-poc/web-war/src/test/java/com/ruisui/bank/sim/CnapsVoucherCreateQueryApiTest.java)
+  - [web-war/src/test/java/com/ruisui/bank/sim/CnapsVoucherLifecycleApiTest.java](file:///D:/Project/ruisui/.worktrees/cnaps-single-table-poc/web-war/src/test/java/com/ruisui/bank/sim/CnapsVoucherLifecycleApiTest.java)
+
+### Command summary
+
+RED:
+
+```bash
+mvn -f web-war/pom.xml test -Dtest=DeploymentArtifactTest
+```
+
+Observed failure before the fix: `NoSuchFieldException` for `lastOperatorNo`, and the response record assertion failed because the fields were missing.
+
+GREEN:
+
+```bash
+mvn -f web-war/pom.xml test -Dtest=DeploymentArtifactTest
+mvn -f web-war/pom.xml test "-Dtest=CnapsVoucherCreateQueryApiTest,CnapsVoucherLifecycleApiTest"
+mvn -f web-war/pom.xml test
+```
+
+All three commands passed after the parity updates.

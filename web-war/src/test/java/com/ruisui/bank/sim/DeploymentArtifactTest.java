@@ -1,5 +1,6 @@
 package com.ruisui.bank.sim;
 
+import com.ruisui.bank.sim.api.dto.VoucherResponse;
 import org.junit.jupiter.api.Test;
 
 import com.ruisui.bank.sim.persistence.CnapsBillPoc;
@@ -37,6 +38,8 @@ class DeploymentArtifactTest {
         assertThat(columnName("accountPart2")).isEqualTo("ACCOUNT_PART2");
         assertThat(columnName("accountPart3")).isEqualTo("ACCOUNT_PART3");
         assertThat(columnName("lastActionAt")).isEqualTo("LAST_ACTION_TIME");
+        assertThat(columnName("lastOperatorNo")).isEqualTo("LAST_OPERATOR_NO");
+        assertThat(columnName("lastRequestId")).isEqualTo("LAST_REQUEST_ID");
 
         assertThat(column("billId").length()).isEqualTo(32);
         assertThat(column("operatorNo").length()).isEqualTo(16);
@@ -45,6 +48,12 @@ class DeploymentArtifactTest {
         assertThat(column("payeeName").nullable()).isFalse();
         assertThat(column("amount").precision()).isEqualTo(18);
         assertThat(column("amount").scale()).isEqualTo(2);
+        assertThat(column("priority").length()).isEqualTo(12);
+        assertThat(column("debitMode").length()).isEqualTo(8);
+        assertThat(column("feeAmount").precision()).isEqualTo(18);
+        assertThat(column("feeAmount").scale()).isEqualTo(2);
+        assertThat(column("feeChargeMode").length()).isEqualTo(8);
+        assertThat(column("sendMode").length()).isEqualTo(8);
         assertThat(column("faxFlag").length()).isEqualTo(1);
         assertThat(column("rejectReason").length()).isEqualTo(200);
         assertThat(column("deleteReason").length()).isEqualTo(200);
@@ -55,10 +64,24 @@ class DeploymentArtifactTest {
         assertThat(schema).contains("PAYEE_ACCOUNT_NO VARCHAR2(64) NOT NULL");
         assertThat(schema).contains("PAYEE_NAME VARCHAR2(128) NOT NULL");
         assertThat(schema).contains("AMOUNT NUMBER(18,2) NOT NULL");
+        assertThat(schema).contains("PRIORITY VARCHAR2(12)");
+        assertThat(schema).contains("DEBIT_MODE VARCHAR2(8)");
+        assertThat(schema).contains("FEE_AMOUNT NUMBER(18,2) DEFAULT 0");
+        assertThat(schema).contains("FEE_CHARGE_MODE VARCHAR2(8)");
+        assertThat(schema).contains("SEND_MODE VARCHAR2(8)");
         assertThat(schema).contains("FAX_FLAG VARCHAR2(1)");
         assertThat(schema).contains("REJECT_REASON VARCHAR2(200)");
         assertThat(schema).contains("DELETE_REASON VARCHAR2(200)");
         assertThat(schema).contains("LAST_ACTION_TIME TIMESTAMP");
+        assertThat(schema).contains("LAST_OPERATOR_NO VARCHAR2(16)");
+        assertThat(schema).contains("LAST_REQUEST_ID VARCHAR2(32)");
+    }
+
+    @Test
+    void voucherResponseExposesLastActionVisibilityFields() {
+        assertThat(VoucherResponse.class.getRecordComponents())
+            .extracting(java.lang.reflect.RecordComponent::getName)
+            .contains("lastOperatorNo", "lastRequestId");
     }
 
     @Test

@@ -103,7 +103,7 @@ public class CnapsVoucherService {
         entity.setDeleteReason(null);
         entity.setDeleteOperatorNo(null);
         entity.setDeleteTime(null);
-        touch(entity);
+        touch(entity, context);
         return mapper.toResponse(repository.save(entity));
     }
 
@@ -117,7 +117,7 @@ public class CnapsVoucherService {
         entity.setDeleteReason(request.deleteReason());
         entity.setDeleteOperatorNo(context.operatorNo());
         entity.setDeleteTime(OffsetDateTime.now());
-        touch(entity);
+        touch(entity, context);
         return mapper.toResponse(repository.save(entity));
     }
 
@@ -133,7 +133,7 @@ public class CnapsVoucherService {
         entity.setCheckerTime(OffsetDateTime.now());
         entity.setReviewComment(request.reviewComment());
         entity.setRejectReason(null);
-        touch(entity);
+        touch(entity, context);
         return mapper.toResponse(repository.save(entity));
     }
 
@@ -150,7 +150,7 @@ public class CnapsVoucherService {
         entity.setCheckerTime(OffsetDateTime.now());
         entity.setRejectReason(request.rejectReason());
         entity.setReviewComment(null);
-        touch(entity);
+        touch(entity, context);
         return mapper.toResponse(repository.save(entity));
     }
 
@@ -254,9 +254,11 @@ public class CnapsVoucherService {
         return entity.getVersionNo() == null ? 1 : entity.getVersionNo() + 1;
     }
 
-    private void touch(CnapsBillPoc entity) {
+    private void touch(CnapsBillPoc entity, HeaderContext context) {
         OffsetDateTime now = OffsetDateTime.now();
         entity.setUpdatedAt(now);
         entity.setLastActionAt(now);
+        entity.setLastOperatorNo(context.operatorNo());
+        entity.setLastRequestId(context.requestId());
     }
 }

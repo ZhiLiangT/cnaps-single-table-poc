@@ -30,6 +30,8 @@ public record VoucherResponse(
     String remark,
     String operatorNo,
     String branchNo,
+    String lastOperatorNo,
+    String lastRequestId,
     String workDate,
     Integer versionNo,
     String rejectReason,

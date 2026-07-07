@@ -6,6 +6,9 @@ public enum ErrorCode {
     REQUIRED_FIELD_EMPTY("2001", "required field empty"),
     FIELD_FORMAT_ERROR("2002", "field format error"),
     DICT_VALUE_INVALID("2003", "dictionary value invalid"),
+    STATUS_CONFLICT("3003", "status conflict"),
+    STATUS_CHANGED("3004", "status changed"),
+    SELF_REVIEW_FORBIDDEN("3005", "self review forbidden"),
     NOT_FOUND("4040", "not found"),
     INTERNAL_ERROR("5000", "internal error");
 

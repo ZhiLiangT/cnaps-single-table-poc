@@ -13,7 +13,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
-        HttpStatus status = ex.getErrorCode() == ErrorCode.NOT_FOUND ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+        HttpStatus status = switch (ex.getErrorCode()) {
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case STATUS_CONFLICT, STATUS_CHANGED -> HttpStatus.CONFLICT;
+            case SELF_REVIEW_FORBIDDEN -> HttpStatus.FORBIDDEN;
+            default -> HttpStatus.BAD_REQUEST;
+        };
         return ResponseEntity.status(status)
             .body(ApiResponse.fail(requestId(request), ex.getErrorCode().code(), ex.getMessage()));
     }

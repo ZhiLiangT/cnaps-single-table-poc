@@ -85,6 +85,9 @@ public class CnapsBillPoc {
     @Column(name = "LAST_ACTION", nullable = false, length = 32)
     private String lastAction;
 
+    @Column(name = "VERSION_NO", nullable = false)
+    private Integer versionNo;
+
     @Column(name = "OPERATOR_NO", nullable = false, length = 32)
     private String operatorNo;
 
@@ -102,6 +105,27 @@ public class CnapsBillPoc {
 
     @Column(name = "LAST_ACTION_AT", nullable = false)
     private OffsetDateTime lastActionAt;
+
+    @Column(name = "REJECT_REASON", length = 512)
+    private String rejectReason;
+
+    @Column(name = "DELETE_REASON", length = 512)
+    private String deleteReason;
+
+    @Column(name = "DELETE_OPERATOR_NO", length = 32)
+    private String deleteOperatorNo;
+
+    @Column(name = "DELETE_TIME")
+    private OffsetDateTime deleteTime;
+
+    @Column(name = "CHECKER_NO", length = 32)
+    private String checkerNo;
+
+    @Column(name = "CHECKER_TIME")
+    private OffsetDateTime checkerTime;
+
+    @Column(name = "REVIEW_COMMENT", length = 512)
+    private String reviewComment;
 
     public String getBillId() {
         return billId;
@@ -295,6 +319,14 @@ public class CnapsBillPoc {
         this.lastAction = lastAction;
     }
 
+    public Integer getVersionNo() {
+        return versionNo;
+    }
+
+    public void setVersionNo(Integer versionNo) {
+        this.versionNo = versionNo;
+    }
+
     public String getOperatorNo() {
         return operatorNo;
     }
@@ -341,5 +373,61 @@ public class CnapsBillPoc {
 
     public void setLastActionAt(OffsetDateTime lastActionAt) {
         this.lastActionAt = lastActionAt;
+    }
+
+    public String getRejectReason() {
+        return rejectReason;
+    }
+
+    public void setRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
+
+    public String getDeleteReason() {
+        return deleteReason;
+    }
+
+    public void setDeleteReason(String deleteReason) {
+        this.deleteReason = deleteReason;
+    }
+
+    public String getDeleteOperatorNo() {
+        return deleteOperatorNo;
+    }
+
+    public void setDeleteOperatorNo(String deleteOperatorNo) {
+        this.deleteOperatorNo = deleteOperatorNo;
+    }
+
+    public OffsetDateTime getDeleteTime() {
+        return deleteTime;
+    }
+
+    public void setDeleteTime(OffsetDateTime deleteTime) {
+        this.deleteTime = deleteTime;
+    }
+
+    public String getCheckerNo() {
+        return checkerNo;
+    }
+
+    public void setCheckerNo(String checkerNo) {
+        this.checkerNo = checkerNo;
+    }
+
+    public OffsetDateTime getCheckerTime() {
+        return checkerTime;
+    }
+
+    public void setCheckerTime(OffsetDateTime checkerTime) {
+        this.checkerTime = checkerTime;
+    }
+
+    public String getReviewComment() {
+        return reviewComment;
+    }
+
+    public void setReviewComment(String reviewComment) {
+        this.reviewComment = reviewComment;
     }
 }

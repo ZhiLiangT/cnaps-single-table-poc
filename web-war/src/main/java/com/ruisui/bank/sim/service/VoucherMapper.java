@@ -30,6 +30,20 @@ public class VoucherMapper {
         CnapsBillPoc entity = new CnapsBillPoc();
         entity.setBillId(billId);
         entity.setSerialNo(serialNo);
+        applySubmissionFields(entity, request, amount, feeAmount);
+        entity.setStatus(VoucherStatus.PENDING_REVIEW.code());
+        entity.setLastAction(LastAction.CREATE.code());
+        entity.setVersionNo(1);
+        entity.setOperatorNo(context.operatorNo());
+        entity.setBranchNo(context.branchNo());
+        entity.setWorkDate(context.workDate());
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
+        entity.setLastActionAt(now);
+        return entity;
+    }
+
+    public void applySubmissionFields(CnapsBillPoc entity, VoucherCreateRequest request, BigDecimal amount, BigDecimal feeAmount) {
         entity.setBusinessType(request.businessType());
         entity.setAccountPart1(request.accountPart1());
         entity.setAccountPart2(request.accountPart2());
@@ -50,15 +64,8 @@ public class VoucherMapper {
         entity.setFaxFlag(request.faxFlag());
         entity.setVoucherNo(request.voucherNo());
         entity.setRemark(request.remark());
-        entity.setStatus(VoucherStatus.PENDING_REVIEW.code());
-        entity.setLastAction(LastAction.CREATE.code());
-        entity.setOperatorNo(context.operatorNo());
-        entity.setBranchNo(context.branchNo());
-        entity.setWorkDate(context.workDate());
-        entity.setCreatedAt(now);
-        entity.setUpdatedAt(now);
-        entity.setLastActionAt(now);
-        return entity;
+        entity.setAmount(amount);
+        entity.setFeeAmount(feeAmount);
     }
 
     public VoucherResponse toResponse(CnapsBillPoc entity) {
@@ -89,7 +96,14 @@ public class VoucherMapper {
             entity.getRemark(),
             entity.getOperatorNo(),
             entity.getBranchNo(),
-            entity.getWorkDate() == null ? null : DATE_FORMAT.format(entity.getWorkDate())
+            entity.getWorkDate() == null ? null : DATE_FORMAT.format(entity.getWorkDate()),
+            entity.getVersionNo(),
+            entity.getRejectReason(),
+            entity.getDeleteOperatorNo(),
+            toText(entity.getDeleteTime()),
+            entity.getCheckerNo(),
+            toText(entity.getCheckerTime()),
+            entity.getReviewComment()
         );
     }
 
@@ -103,5 +117,9 @@ public class VoucherMapper {
 
     private String toText(BigDecimal value) {
         return value == null ? null : value.toPlainString();
+    }
+
+    private String toText(OffsetDateTime value) {
+        return value == null ? null : value.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 }

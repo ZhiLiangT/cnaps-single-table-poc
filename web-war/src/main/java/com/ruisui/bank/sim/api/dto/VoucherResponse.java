@@ -1,5 +1,8 @@
 package com.ruisui.bank.sim.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record VoucherResponse(
     String billId,
     String serialNo,
@@ -27,6 +30,13 @@ public record VoucherResponse(
     String remark,
     String operatorNo,
     String branchNo,
-    String workDate
+    String workDate,
+    Integer versionNo,
+    String rejectReason,
+    String deleteOperatorNo,
+    String deleteTime,
+    String checkerNo,
+    String checkerTime,
+    String reviewComment
 ) {
 }

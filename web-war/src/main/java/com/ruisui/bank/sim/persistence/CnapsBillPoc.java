@@ -13,22 +13,22 @@ import java.time.OffsetDateTime;
 @Table(name = "T_CNAPS_BILL_POC")
 public class CnapsBillPoc {
     @Id
-    @Column(name = "BILL_ID", nullable = false, length = 64)
+    @Column(name = "BILL_ID", nullable = false, length = 32)
     private String billId;
 
     @Column(name = "SERIAL_NO", nullable = false, length = 16)
     private String serialNo;
 
-    @Column(name = "BUSINESS_TYPE", nullable = false, length = 16)
+    @Column(name = "BUSINESS_TYPE", nullable = false, length = 12)
     private String businessType;
 
-    @Column(name = "ACCOUNT_PART_1", length = 16)
+    @Column(name = "ACCOUNT_PART1", length = 32)
     private String accountPart1;
 
-    @Column(name = "ACCOUNT_PART_2", length = 16)
+    @Column(name = "ACCOUNT_PART2", length = 32)
     private String accountPart2;
 
-    @Column(name = "ACCOUNT_PART_3", length = 32)
+    @Column(name = "ACCOUNT_PART3", length = 64)
     private String accountPart3;
 
     @Column(name = "ACCOUNT_NAME", length = 128)
@@ -37,10 +37,10 @@ public class CnapsBillPoc {
     @Column(name = "PAYER_NAME", length = 128)
     private String payerName;
 
-    @Column(name = "PAYEE_ACCOUNT_NO", length = 64)
+    @Column(name = "PAYEE_ACCOUNT_NO", nullable = false, length = 64)
     private String payeeAccountNo;
 
-    @Column(name = "PAYEE_NAME", length = 128)
+    @Column(name = "PAYEE_NAME", nullable = false, length = 128)
     private String payeeName;
 
     @Column(name = "PRIORITY", length = 16)
@@ -55,7 +55,7 @@ public class CnapsBillPoc {
     @Column(name = "SYSTEM_TYPE", length = 16)
     private String systemType;
 
-    @Column(name = "AMOUNT", precision = 19, scale = 2)
+    @Column(name = "AMOUNT", nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
 
     @Column(name = "DEBIT_MODE", length = 16)
@@ -70,7 +70,7 @@ public class CnapsBillPoc {
     @Column(name = "SEND_MODE", length = 16)
     private String sendMode;
 
-    @Column(name = "FAX_FLAG", length = 16)
+    @Column(name = "FAX_FLAG", length = 1)
     private String faxFlag;
 
     @Column(name = "VOUCHER_NO", length = 64)
@@ -82,16 +82,16 @@ public class CnapsBillPoc {
     @Column(name = "STATUS", nullable = false, length = 32)
     private String status;
 
-    @Column(name = "LAST_ACTION", nullable = false, length = 32)
+    @Column(name = "LAST_ACTION", length = 32)
     private String lastAction;
 
     @Column(name = "VERSION_NO", nullable = false)
     private Integer versionNo;
 
-    @Column(name = "OPERATOR_NO", nullable = false, length = 32)
+    @Column(name = "OPERATOR_NO", nullable = false, length = 16)
     private String operatorNo;
 
-    @Column(name = "BRANCH_NO", nullable = false, length = 32)
+    @Column(name = "BRANCH_NO", nullable = false, length = 12)
     private String branchNo;
 
     @Column(name = "WORK_DATE", nullable = false)
@@ -103,22 +103,22 @@ public class CnapsBillPoc {
     @Column(name = "UPDATED_AT", nullable = false)
     private OffsetDateTime updatedAt;
 
-    @Column(name = "LAST_ACTION_AT", nullable = false)
+    @Column(name = "LAST_ACTION_TIME")
     private OffsetDateTime lastActionAt;
 
-    @Column(name = "REJECT_REASON", length = 512)
+    @Column(name = "REJECT_REASON", length = 200)
     private String rejectReason;
 
-    @Column(name = "DELETE_REASON", length = 512)
+    @Column(name = "DELETE_REASON", length = 200)
     private String deleteReason;
 
-    @Column(name = "DELETE_OPERATOR_NO", length = 32)
+    @Column(name = "DELETE_OPERATOR_NO", length = 16)
     private String deleteOperatorNo;
 
     @Column(name = "DELETE_TIME")
     private OffsetDateTime deleteTime;
 
-    @Column(name = "CHECKER_NO", length = 32)
+    @Column(name = "CHECKER_NO", length = 16)
     private String checkerNo;
 
     @Column(name = "CHECKER_TIME")

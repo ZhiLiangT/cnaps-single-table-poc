@@ -106,6 +106,23 @@ class CnapsVoucherLifecycleApiTest {
     }
 
     @Test
+    void reviewReturnRejectsOverlongReason() throws Exception {
+        String billId = createVoucher("REQ-LIFE-020", "77210021");
+        String rejectReason = "X".repeat(201);
+
+        mockMvc.perform(post("/api/cnaps/vouchers/{billId}/review-return", billId)
+                .header("requestId", "REQ-LIFE-021")
+                .header("operatorNo", "77210022")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"rejectReason\":\"" + rejectReason + "\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("2002"));
+    }
+
+    @Test
     void deletePendingVoucherAndRejectApprovedVoucherDelete() throws Exception {
         String pendingBillId = createVoucher("REQ-LIFE-009", "77210021");
 

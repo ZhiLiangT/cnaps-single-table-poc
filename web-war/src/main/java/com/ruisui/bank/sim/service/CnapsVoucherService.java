@@ -155,12 +155,20 @@ public class CnapsVoucherService {
     }
 
     private void validateCreate(VoucherCreateRequest request) {
-        if (request.payeeAccountNo() == null || request.payeeAccountNo().isBlank()) {
-            throw new BusinessException(ErrorCode.REQUIRED_FIELD_EMPTY, "payeeAccountNo is required");
-        }
+        requireRequiredField(request.accountPart1(), "accountPart1");
+        requireRequiredField(request.accountPart2(), "accountPart2");
+        requireRequiredField(request.accountPart3(), "accountPart3");
+        requireRequiredField(request.payeeAccountNo(), "payeeAccountNo");
+        requireRequiredField(request.payeeName(), "payeeName");
+        requireRequiredField(request.priority(), "priority");
+        requireRequiredField(request.amount(), "amount");
+
         BigDecimal amount = parseAmount(request.amount());
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(ErrorCode.FIELD_FORMAT_ERROR, "amount must be greater than 0");
+        }
+        if (amount.scale() > 2) {
+            throw new BusinessException(ErrorCode.FIELD_FORMAT_ERROR, "amount must have no more than two decimal places");
         }
         requireDictionaryValue(request.businessType(), SUPPORTED_BUSINESS_TYPES, "businessType");
         requireDictionaryValue(request.priority(), SUPPORTED_PRIORITIES, "priority");
@@ -197,6 +205,12 @@ public class CnapsVoucherService {
         }
     }
 
+    private void requireRequiredField(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(ErrorCode.REQUIRED_FIELD_EMPTY, fieldName + " is required");
+        }
+    }
+
     private CnapsBillPoc loadLifecycleEntity(HeaderContext context, String billId) {
         CnapsBillPoc entity = repository.findByBillId(billId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "voucher not found"));
@@ -229,9 +243,15 @@ public class CnapsVoucherService {
         if (rejectReason == null || rejectReason.isBlank()) {
             throw new BusinessException(ErrorCode.REQUIRED_FIELD_EMPTY, "rejectReason is required");
         }
+        if (rejectReason.length() > 200) {
+            throw new BusinessException(ErrorCode.FIELD_FORMAT_ERROR, "rejectReason must be 200 characters or fewer");
+        }
     }
 
     private BigDecimal parseAmount(String value) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(ErrorCode.REQUIRED_FIELD_EMPTY, "amount is required");
+        }
         try {
             return new BigDecimal(value);
         } catch (Exception ex) {

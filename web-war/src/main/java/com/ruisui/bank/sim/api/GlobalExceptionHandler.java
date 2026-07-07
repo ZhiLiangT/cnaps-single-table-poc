@@ -5,6 +5,7 @@ import com.ruisui.bank.sim.domain.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataAccessException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -23,10 +24,16 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.fail(requestId(request), ex.getErrorCode().code(), ex.getMessage()));
     }
 
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataAccessException(DataAccessException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse.fail(requestId(request), ErrorCode.PERSISTENCE_ERROR.code(), ErrorCode.PERSISTENCE_ERROR.message()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception ex, HttpServletRequest request) {
-        return ResponseEntity.status(HttpStatus.OK)
-            .body(ApiResponse.fail(requestId(request), ErrorCode.INTERNAL_ERROR.code(), ErrorCode.INTERNAL_ERROR.message()));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse.fail(requestId(request), ErrorCode.UNKNOWN_ERROR.code(), ErrorCode.UNKNOWN_ERROR.message()));
     }
 
     private String requestId(HttpServletRequest request) {

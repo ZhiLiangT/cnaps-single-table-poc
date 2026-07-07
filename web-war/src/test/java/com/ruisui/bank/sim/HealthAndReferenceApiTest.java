@@ -43,4 +43,13 @@ class HealthAndReferenceApiTest {
             .andExpect(jsonPath("$.data[0].bankNo").value("102290000002"))
             .andExpect(jsonPath("$.data[0].bankName").value("接收行名称"));
     }
+
+    @Test
+    void bankQuerySupportsKeywordFiltering() throws Exception {
+        mockMvc.perform(get("/api/banks").queryParam("keyword", "接收"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data[0].bankNo").value("102290000002"))
+            .andExpect(jsonPath("$.data[0].bankName").value("接收行名称"));
+    }
 }

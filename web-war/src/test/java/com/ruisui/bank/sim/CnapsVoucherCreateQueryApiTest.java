@@ -71,6 +71,54 @@ class CnapsVoucherCreateQueryApiTest {
     }
 
     @Test
+    void missingAccountPart1ReturnsRequiredFieldError() throws Exception {
+        String body = validCreateBody("5600.00").replace("\"accountPart1\":\"404045\",", "");
+
+        mockMvc.perform(post("/api/cnaps/vouchers")
+                .header("requestId", "REQ-CREATE-009")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("2001"));
+    }
+
+    @Test
+    void missingPayeeNameReturnsRequiredFieldError() throws Exception {
+        String body = validCreateBody("5600.00").replace("\"payeeName\":\"收款人名称\",", "");
+
+        mockMvc.perform(post("/api/cnaps/vouchers")
+                .header("requestId", "REQ-CREATE-010")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("2001"));
+    }
+
+    @Test
+    void missingAmountReturnsRequiredFieldError() throws Exception {
+        String body = validCreateBody("5600.00").replace("\"amount\":\"5600.00\",", "");
+
+        mockMvc.perform(post("/api/cnaps/vouchers")
+                .header("requestId", "REQ-CREATE-011")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("2001"));
+    }
+
+    @Test
     void zeroAmountReturnsFormatError() throws Exception {
         mockMvc.perform(post("/api/cnaps/vouchers")
                 .header("requestId", "REQ-CREATE-003")
@@ -79,6 +127,20 @@ class CnapsVoucherCreateQueryApiTest {
                 .header("workDate", "2026-07-07")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(validCreateBody("0.00")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("2002"));
+    }
+
+    @Test
+    void amountWithMoreThanTwoDecimalsReturnsFormatError() throws Exception {
+        mockMvc.perform(post("/api/cnaps/vouchers")
+                .header("requestId", "REQ-CREATE-012")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validCreateBody("1.234")))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.respCode").value("2002"));
@@ -149,6 +211,18 @@ class CnapsVoucherCreateQueryApiTest {
             .andExpect(jsonPath("$.data.page.totalElements").value(1))
             .andExpect(jsonPath("$.data.content[0].billId").value(second.billId()))
             .andExpect(jsonPath("$.data.content[0].serialNo").value(second.serialNo()));
+    }
+
+    @Test
+    void detailOfNonexistentVoucherReturnsNotFound() throws Exception {
+        mockMvc.perform(get("/api/cnaps/vouchers/{billId}", "B202607077720009999")
+                .header("requestId", "REQ-DETAIL-404")
+                .header("operatorNo", "77210021")
+                .header("branchNo", "772")
+                .header("workDate", "2026-07-07"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.respCode").value("3001"));
     }
 
     private CreatedVoucher createVoucher(String requestId, String amount) throws Exception {

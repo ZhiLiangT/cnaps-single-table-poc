@@ -50,12 +50,14 @@ public class ReferenceController {
     }
 
     @GetMapping("/banks")
-    public ApiResponse<List<BankItem>> banks(@RequestParam(required = false) String bankNo) {
-        if (bankNo == null || bankNo.isBlank()) {
-            return ApiResponse.ok(null, "success", BANKS);
-        }
-        return ApiResponse.ok(null, "success",
-            BANKS.stream().filter(bank -> bank.bankNo().equals(bankNo)).toList());
+    public ApiResponse<List<BankItem>> banks(
+        @RequestParam(required = false) String bankNo,
+        @RequestParam(required = false) String keyword
+    ) {
+        return ApiResponse.ok(null, "success", BANKS.stream()
+            .filter(bank -> bankNo == null || bankNo.isBlank() || bank.bankNo().equals(bankNo))
+            .filter(bank -> keyword == null || keyword.isBlank() || bank.bankName().contains(keyword))
+            .toList());
     }
 
     public record HealthData(String status, List<String> services) {

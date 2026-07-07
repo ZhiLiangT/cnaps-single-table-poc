@@ -1,0 +1,19 @@
+# cnaps_poc.fml32
+SYS_ID          10001   string
+TXN_CODE        10002   string
+REQ_ID          10003   string
+OPERATOR_NO     10004   string
+BRANCH_NO       10005   string
+WORK_DATE       10006   string
+RESP_CODE       10007   string
+RESP_MSG        10008   string
+BILL_ID         11001   string
+SERIAL_NO       11002   string
+BUSINESS_TYPE   11003   string
+AMOUNT          11004   string
+STATUS          11005   string
+PAYEE_ACCT      11006   string
+PAYEE_NAME      11007   string
+REJECT_REASON   11008   string
+REVIEW_COMMENT  11009   string
+LAST_ACTION     11010   string

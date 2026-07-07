@@ -13,7 +13,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
-        return ResponseEntity.status(HttpStatus.OK)
+        HttpStatus status = ex.getErrorCode() == ErrorCode.NOT_FOUND ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status)
             .body(ApiResponse.fail(requestId(request), ex.getErrorCode().code(), ex.getMessage()));
     }
 
@@ -24,6 +25,10 @@ public class GlobalExceptionHandler {
     }
 
     private String requestId(HttpServletRequest request) {
-        return request.getHeader("X-Request-Id");
+        String requestId = request.getHeader("requestId");
+        if (requestId == null || requestId.isBlank()) {
+            requestId = request.getHeader("X-Request-Id");
+        }
+        return requestId;
     }
 }

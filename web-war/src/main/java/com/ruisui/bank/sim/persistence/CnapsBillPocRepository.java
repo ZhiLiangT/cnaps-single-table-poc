@@ -19,16 +19,21 @@ public interface CnapsBillPocRepository extends JpaRepository<CnapsBillPoc, Stri
         """)
     String findMaxSerialNo(@Param("workDate") LocalDate workDate, @Param("branchNo") String branchNo);
 
-    Page<CnapsBillPoc> findByWorkDateAndBranchNoAndStatus(
-        LocalDate workDate,
-        String branchNo,
-        String status,
-        Pageable pageable
-    );
-
-    Page<CnapsBillPoc> findByWorkDateAndBranchNo(
-        LocalDate workDate,
-        String branchNo,
+    @Query("""
+        select v
+        from CnapsBillPoc v
+        where v.workDate = :workDate
+          and v.branchNo = :branchNo
+          and (:status is null or :status = '' or v.status = :status)
+          and (:operatorNo is null or :operatorNo = '' or v.operatorNo = :operatorNo)
+          and (:serialNo is null or :serialNo = '' or v.serialNo = :serialNo)
+        """)
+    Page<CnapsBillPoc> findByWorkDateAndBranchNoWithFilters(
+        @Param("workDate") LocalDate workDate,
+        @Param("branchNo") String branchNo,
+        @Param("status") String status,
+        @Param("operatorNo") String operatorNo,
+        @Param("serialNo") String serialNo,
         Pageable pageable
     );
 }

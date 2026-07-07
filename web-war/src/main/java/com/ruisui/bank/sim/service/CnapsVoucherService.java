@@ -8,7 +8,6 @@ import com.ruisui.bank.sim.domain.ErrorCode;
 import com.ruisui.bank.sim.persistence.CnapsBillPoc;
 import com.ruisui.bank.sim.persistence.CnapsBillPocRepository;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -25,6 +24,12 @@ public class CnapsVoucherService {
     private static final DateTimeFormatter BILL_ID_DATE_FORMAT = DateTimeFormatter.BASIC_ISO_DATE;
     private static final int MAX_PAGE_SIZE = 50;
     private static final List<String> SUPPORTED_BUSINESS_TYPES = List.of("02102");
+    private static final List<String> SUPPORTED_PRIORITIES = List.of("NORM");
+    private static final List<String> SUPPORTED_FEE_CHARGE_MODES = List.of("1");
+    private static final List<String> SUPPORTED_SEND_MODES = List.of("0");
+    private static final List<String> SUPPORTED_DEBIT_MODES = List.of("1");
+    private static final List<String> SUPPORTED_FAX_FLAGS = List.of("0", "1");
+    private static final List<String> SUPPORTED_SYSTEM_TYPES = List.of("CNAPS");
 
     private final CnapsBillPocRepository repository;
     private final VoucherMapper mapper;
@@ -52,20 +57,15 @@ public class CnapsVoucherService {
     @Transactional(readOnly = true)
     public Page<VoucherResponse> query(HeaderContext context, String status, String operatorNo, String serialNo, int page, int size) {
         Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size), Sort.by(Sort.Direction.ASC, "serialNo"));
-        Page<CnapsBillPoc> result = status == null || status.isBlank()
-            ? repository.findByWorkDateAndBranchNo(context.workDate(), context.branchNo(), pageable)
-            : repository.findByWorkDateAndBranchNoAndStatus(context.workDate(), context.branchNo(), status, pageable);
-
-        if ((operatorNo == null || operatorNo.isBlank()) && (serialNo == null || serialNo.isBlank())) {
-            return mapper.toResponsePage(result);
-        }
-
-        List<VoucherResponse> filtered = result.getContent().stream()
-            .filter(item -> operatorNo == null || operatorNo.isBlank() || operatorNo.equals(item.getOperatorNo()))
-            .filter(item -> serialNo == null || serialNo.isBlank() || serialNo.equals(item.getSerialNo()))
-            .map(mapper::toResponse)
-            .toList();
-        return new PageImpl<>(filtered, pageable, filtered.size());
+        Page<CnapsBillPoc> result = repository.findByWorkDateAndBranchNoWithFilters(
+            context.workDate(),
+            context.branchNo(),
+            status,
+            operatorNo,
+            serialNo,
+            pageable
+        );
+        return mapper.toResponsePage(result);
     }
 
     @Transactional(readOnly = true)
@@ -96,9 +96,13 @@ public class CnapsVoucherService {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(ErrorCode.FIELD_FORMAT_ERROR, "amount must be greater than 0");
         }
-        if (!SUPPORTED_BUSINESS_TYPES.contains(request.businessType())) {
-            throw new BusinessException(ErrorCode.DICT_VALUE_INVALID, "businessType is invalid");
-        }
+        requireDictionaryValue(request.businessType(), SUPPORTED_BUSINESS_TYPES, "businessType");
+        requireDictionaryValue(request.priority(), SUPPORTED_PRIORITIES, "priority");
+        requireDictionaryValue(request.feeChargeMode(), SUPPORTED_FEE_CHARGE_MODES, "feeChargeMode");
+        requireDictionaryValue(request.sendMode(), SUPPORTED_SEND_MODES, "sendMode");
+        requireDictionaryValue(request.debitMode(), SUPPORTED_DEBIT_MODES, "debitMode");
+        requireDictionaryValue(request.faxFlag(), SUPPORTED_FAX_FLAGS, "faxFlag");
+        requireDictionaryValue(request.systemType(), SUPPORTED_SYSTEM_TYPES, "systemType");
     }
 
     private String nextSerialNo(String maxSerialNo) {
@@ -119,5 +123,11 @@ public class CnapsVoucherService {
             return 10;
         }
         return Math.min(size, MAX_PAGE_SIZE);
+    }
+
+    private void requireDictionaryValue(String value, List<String> supportedValues, String fieldName) {
+        if (value == null || value.isBlank() || !supportedValues.contains(value)) {
+            throw new BusinessException(ErrorCode.DICT_VALUE_INVALID, fieldName + " is invalid");
+        }
     }
 }

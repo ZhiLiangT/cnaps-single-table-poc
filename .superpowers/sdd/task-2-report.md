@@ -89,3 +89,51 @@ Result:
 
 - No functional concerns from the implemented feature.
 - Maven/Surefire still prints a Java agent warning on this environment's JDK 21 runtime; the build and tests still pass.
+
+## Reviewer Fix Follow-Up
+
+### What changed
+
+- Moved voucher query filtering for `operatorNo` and `serialNo` into the repository query so pagination and total counts are computed on the filtered dataset.
+- Added fixed dictionary validation for `priority`, `feeChargeMode`, `sendMode`, `debitMode`, `faxFlag`, and `systemType` in addition to `businessType`.
+- Enforced required headers `requestId`, `operatorNo`, `branchNo`, and `workDate` at the resolver boundary.
+- Added `channel` to `HeaderContext` with a default of `WEBFE`.
+- Added a focused resolver test for the default and explicit channel values.
+
+### Command / Output Summary
+
+Focused red run:
+
+```bash
+mvn -f web-war/pom.xml test -Dtest=CnapsVoucherCreateQueryApiTest
+```
+
+Observed failures before the fix:
+
+- `operatorAndSerialAreFilteredBeforePagination` failed because filtering was still happening after pagination.
+- `invalidPriorityReturnsDictionaryError` failed because non-business dictionary values were not validated.
+- `missingRequestIdReturnsRequiredFieldError` failed because required headers were not enforced.
+
+Focused green run:
+
+```bash
+mvn -f web-war/pom.xml test -Dtest=CnapsVoucherCreateQueryApiTest
+```
+
+Result:
+
+- 7 tests run
+- 0 failures
+- 0 errors
+
+Full suite:
+
+```bash
+mvn -f web-war/pom.xml test
+```
+
+Result:
+
+- 12 tests run
+- 0 failures
+- 0 errors

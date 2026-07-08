@@ -122,12 +122,15 @@ class DeploymentArtifactTest {
     @Test
     void linuxConfigAndScriptsTargetPocAppHome() throws Exception {
         String env = Files.readString(root.resolve("conf/env.linux.sh"));
+        String dbEnv = Files.readString(root.resolve("conf/db.env"));
         String start = Files.readString(root.resolve("scripts/start.sh"));
         String stop = Files.readString(root.resolve("scripts/stop.sh"));
         String status = Files.readString(root.resolve("scripts/status.sh"));
 
         assertThat(env).contains("APP_HOME=${APP_HOME:-/opt/ruisui-bank-sim}");
         assertThat(env).contains("LD_LIBRARY_PATH");
+        assertThat(dbEnv).contains("PATH=$ORACLE_HOME:${PATH:-}");
+        assertThat(dbEnv).contains("LD_LIBRARY_PATH=$ORACLE_HOME:${LD_LIBRARY_PATH:-}");
         assertThat(start).contains("tmboot -y");
         assertThat(stop).contains("tmshutdown -y");
         assertThat(status).contains("tmadmin");

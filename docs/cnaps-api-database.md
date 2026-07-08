@@ -2,11 +2,11 @@
 
 版本日期：2026-07-08
 
-适用范围：当前 `cnaps-single-table-poc` Spring Boot POC 实现。
+适用范围：当前 `cnaps-single-table-poc` Tomcat WebFE WAR 实现。
 
 ## 1. 系统说明
 
-当前项目提供 CNAPS 往账凭证单表 POC，运行形态为 Spring Boot HTTP JSON API，默认端口 `8080`，默认使用 H2 内存数据库的 Oracle 兼容模式进行本地验证。
+当前项目提供 CNAPS 往账凭证单表 POC，运行形态为传统 Servlet/JSP WebFE WAR，部署到外部 Tomcat 9，默认端口 `8080`，默认上下文路径为 `/ruisui-bank-sim`。本地 CRUD 验证使用 WebFE 内置 mock Tuxedo 客户端；本文中的 Oracle 单表结构用于目标数据库落地说明。
 
 当前数据库业务表为单表：
 
@@ -14,14 +14,14 @@
 T_CNAPS_BILL_POC
 ```
 
-当前服务清单保留 Tuxedo 风格服务名，但运行时由 Spring Boot Service 层模拟交易服务行为。
+当前服务清单保留 Tuxedo 风格服务名；本地验证运行时由 WebFE mock Tuxedo 客户端模拟交易服务行为。
 
 ## 2. 基础约定
 
 ### 2.1 Base URL
 
 ```text
-http://localhost:8080
+http://localhost:8080/ruisui-bank-sim
 ```
 
 ### 2.2 Content-Type
@@ -629,7 +629,7 @@ POST /api/cnaps/vouchers/{billId}/review-return
 
 ### 5.12 二次复核步骤
 
-说明：本节为二次复核目标流程说明。当前 Spring Boot POC 仅实现单级复核接口 `review-pass` 和 `review-return`，尚未实现独立的一次复核、二次复核接口和数据库字段。
+说明：本节为二次复核目标流程说明。当前 Tomcat WebFE POC 仅实现单级复核接口 `review-pass` 和 `review-return`，尚未实现独立的一次复核、二次复核接口和数据库字段。
 
 建议二次复核采用以下处理步骤：
 
@@ -917,7 +917,7 @@ ALTER TABLE T_CNAPS_BILL_POC ADD (
 ### 8.1 创建凭证
 
 ```bash
-curl -X POST http://localhost:8080/api/cnaps/vouchers \
+curl -X POST http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers \
   -H "Content-Type: application/json" \
   -d '{
     "businessType":"02102",
@@ -946,13 +946,13 @@ curl -X POST http://localhost:8080/api/cnaps/vouchers \
 ### 8.2 查询凭证
 
 ```bash
-curl "http://localhost:8080/api/cnaps/vouchers?status=10_PENDING_REVIEW&page=0&size=10"
+curl "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers?status=10_PENDING_REVIEW&page=0&size=10"
 ```
 
 ### 8.3 复核通过
 
 ```bash
-curl -X POST http://localhost:8080/api/cnaps/vouchers/{billId}/review-pass \
+curl -X POST http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/{billId}/review-pass \
   -H "Content-Type: application/json" \
   -d '{"reviewComment":"复核通过"}'
 ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-export APP_HOME=/opt/ruisui-bank-sim
+export APP_HOME=${APP_HOME:-/opt/ruisui-bank-sim}
 export TUXDIR=${TUXDIR:-/opt/tuxedo}
 export TUXCONFIG=${TUXCONFIG:-$APP_HOME/tuxedo/tuxconfig}
 export FLDTBLDIR32=${FLDTBLDIR32:-$APP_HOME/tuxedo-server/fml}

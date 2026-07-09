@@ -1,4 +1,5 @@
 #include <atmi.h>
+#include "cnaps_db.h"
 #include "cnaps_service.h"
 
 void SYSHEALTH(TPSVCINFO *rqst);
@@ -18,10 +19,14 @@ int tpsvrinit(int argc, char **argv)
     (void)argc;
     (void)argv;
     userlog("cnapspocsvr initialized");
+    if (db_connect() != 0) {
+        userlog("Oracle connection is not available during startup; services will report Oracle DOWN until db.env points to a reachable database");
+    }
     return 0;
 }
 
 void tpsvrdone(void)
 {
+    db_disconnect();
     userlog("cnapspocsvr stopped");
 }

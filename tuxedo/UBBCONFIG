@@ -1,15 +1,32 @@
 *RESOURCES
-IPCKEY          555000
-MASTER          1
-MAXACCESSERS    8
-MAXSERVERS      8
+IPCKEY          55555
+DOMAINID        cnaps_poc
+MASTER          site1
+MAXACCESSERS    64
+MAXSERVERS      32
+MAXSERVICES     128
 MODEL           SHM
+SECURITY        NONE
+
+*MACHINES
+DEFAULT:
+                APPDIR="${APP_HOME}/tuxedo-server/bin"
+                TUXCONFIG="${TUXCONFIG}"
+                TUXDIR="${TUXDIR}"
+                ULOGPFX="${ULOGPFX}"
+                MAXWSCLIENTS=32
+"localhost.localdomain" LMID=site1
 
 *GROUPS
-GBLGRP         LMID=site1 GRPNO=1
+APPGRP         LMID=site1 GRPNO=1
+JOLTGRP        LMID=site1 GRPNO=2
 
 *SERVERS
-cnapspocsvr    SRVGRP=GBLGRP SRVID=1 RESTART=Y MIN=1 MAX=1
+DEFAULT:
+               CLOPT="-A"
+cnapspocsvr    SRVGRP=APPGRP SRVID=1 RESTART=Y MAXGEN=5 MIN=1 MAX=1
+TMMETADATA     SRVGRP=JOLTGRP SRVID=9 RESTART=Y MAXGEN=5 CLOPT="-A -- -f ${APP_HOME}/tuxedo/jolt/cnaps.metarepos"
+JSL            SRVGRP=JOLTGRP SRVID=10 RESTART=Y MAXGEN=5 CLOPT="-A -- -n //127.0.0.1:8000 -m 1 -M 4 -x 10 -T 10"
 
 *SERVICES
 SYSHEALTH

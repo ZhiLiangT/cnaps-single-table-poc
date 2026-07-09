@@ -14,16 +14,18 @@ public final class TuxedoClientProvider {
             return tuxedoClient;
         }
 
-        TuxedoClient created = create(context.getInitParameter("tuxedo.client.mode"));
+        TuxedoRuntimeConfig config = TuxedoRuntimeConfig.from(context);
+        TuxedoClient created = create(config);
+        context.log("CNAPS WebFE Tuxedo client mode=" + config.mode() + ", joltListen=" + config.joltListen());
         context.setAttribute(ATTRIBUTE_NAME, created);
         return created;
     }
 
-    private static TuxedoClient create(String mode) {
-        if ("jolt".equalsIgnoreCase(mode)) {
-            return new JoltTuxedoClient();
+    static TuxedoClient create(TuxedoRuntimeConfig config) {
+        if ("jolt".equalsIgnoreCase(config.mode())) {
+            return new JoltTuxedoClient(config);
         }
-        if ("atmi".equalsIgnoreCase(mode)) {
+        if ("atmi".equalsIgnoreCase(config.mode())) {
             return new AtmiTuxedoClient();
         }
         return new MockTuxedoClient();

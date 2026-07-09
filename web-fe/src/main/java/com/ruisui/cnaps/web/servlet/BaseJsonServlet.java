@@ -43,7 +43,7 @@ abstract class BaseJsonServlet extends HttpServlet {
             requestMapper.serviceName(request.getMethod(), RequestSupport.apiPath(request)),
             tuxedoRequest
         );
-        ApiResponse<Map<String, Object>> apiResponse = responseMapper.toApiResponse(requestId, tuxedoResponse);
+        ApiResponse<Object> apiResponse = responseMapper.toApiResponse(requestId, tuxedoResponse);
         JsonSupport.write(response, httpStatus(tuxedoResponse.respCode()), apiResponse);
     }
 
@@ -53,7 +53,9 @@ abstract class BaseJsonServlet extends HttpServlet {
             case "2001", "2002", "2003" -> HttpServletResponse.SC_BAD_REQUEST;
             case "3001" -> HttpServletResponse.SC_NOT_FOUND;
             case "3002", "3003", "3004" -> HttpServletResponse.SC_CONFLICT;
-            case "4002", "4003" -> HttpServletResponse.SC_BAD_GATEWAY;
+            case "3005" -> HttpServletResponse.SC_FORBIDDEN;
+            case "4002" -> HttpServletResponse.SC_GATEWAY_TIMEOUT;
+            case "4003" -> HttpServletResponse.SC_SERVICE_UNAVAILABLE;
             default -> HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
         };
     }

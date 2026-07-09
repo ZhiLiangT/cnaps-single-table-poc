@@ -7,7 +7,7 @@
     <artifactId>web-fe</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>war</packaging>
-    <name>cnaps-web-fe</name>
+    <name>ruisui-bank-sim</name>
 
     <properties>
         <java.version>17</java.version>
@@ -56,7 +56,7 @@
     </dependencies>
 
     <build>
-        <finalName>cnaps-web</finalName>
+        <finalName>ruisui-bank-sim</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -1,5 +1,13 @@
 .worktrees
 .worktrees/
 .superpowers/
+deploy-bundle/
+logs/
+.adm/
 web-war/target/
 web-fe/target/
+tuxedo-server/bin/
+tuxedo-server/fml/*.h
+tuxedo/tuxconfig
+tuxedo/jolt/*.metarepos
+conf/*.bak-*

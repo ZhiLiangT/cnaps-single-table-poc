@@ -13,15 +13,31 @@ public class TuxedoRequestMapper {
         Map.entry("accountPart1", "ACCOUNT_PART1"),
         Map.entry("accountPart2", "ACCOUNT_PART2"),
         Map.entry("accountPart3", "ACCOUNT_PART3"),
+        Map.entry("accountName", "ACCOUNT_NAME"),
+        Map.entry("payerName", "PAYER_NAME"),
         Map.entry("payeeAccountNo", "PAYEE_ACCT"),
         Map.entry("payeeName", "PAYEE_NAME"),
+        Map.entry("priority", "PRIORITY"),
+        Map.entry("receiveBankNo", "RECEIVE_BANK_NO"),
+        Map.entry("receiveBankName", "RECEIVE_BANK_NAME"),
+        Map.entry("systemType", "SYSTEM_TYPE"),
         Map.entry("amount", "AMOUNT"),
+        Map.entry("debitMode", "DEBIT_MODE"),
+        Map.entry("feeAmount", "FEE_AMOUNT"),
+        Map.entry("feeChargeMode", "FEE_CHARGE_MODE"),
+        Map.entry("sendMode", "SEND_MODE"),
+        Map.entry("faxFlag", "FAX_FLAG"),
+        Map.entry("voucherNo", "VOUCHER_NO"),
+        Map.entry("remark", "REMARK"),
         Map.entry("status", "STATUS"),
         Map.entry("rejectReason", "REJECT_REASON"),
         Map.entry("reviewComment", "REVIEW_COMMENT"),
         Map.entry("deleteReason", "DELETE_REASON"),
         Map.entry("page", "PAGE_NO"),
-        Map.entry("size", "PAGE_SIZE")
+        Map.entry("size", "PAGE_SIZE"),
+        Map.entry("pageNo", "PAGE_NO"),
+        Map.entry("pageSize", "PAGE_SIZE"),
+        Map.entry("includeDeleted", "INCLUDE_DELETED")
     );
 
     public String serviceName(String method, String path) {

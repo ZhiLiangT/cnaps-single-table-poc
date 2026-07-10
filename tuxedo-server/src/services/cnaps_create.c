@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include "cnaps_db.h"
@@ -23,6 +24,49 @@ static void compact_date(const char *work_date, char *out, size_t out_size)
         }
     }
     out[j] = '\0';
+}
+
+static int valid_money(const char *value, int zero_allowed)
+{
+    int decimal_seen = 0;
+    int digits_seen = 0;
+    int fractional_digits = 0;
+    int nonzero_seen = 0;
+
+    if (value == NULL || value[0] == '\0') {
+        return 0;
+    }
+    for (const unsigned char *cursor = (const unsigned char *)value; *cursor != '\0'; ++cursor) {
+        if (isdigit(*cursor)) {
+            digits_seen = 1;
+            nonzero_seen = nonzero_seen || *cursor != '0';
+            if (decimal_seen && ++fractional_digits > 2) {
+                return 0;
+            }
+        } else if (*cursor == '.' && !decimal_seen && digits_seen) {
+            decimal_seen = 1;
+        } else {
+            return 0;
+        }
+    }
+    if (!digits_seen || (decimal_seen && fractional_digits == 0)) {
+        return 0;
+    }
+    return zero_allowed || nonzero_seen;
+}
+
+static int required_field_missing(const cnaps_voucher_row *row)
+{
+    return row->work_date[0] == '\0'
+        || row->business_type[0] == '\0'
+        || row->account_part1[0] == '\0'
+        || row->account_part2[0] == '\0'
+        || row->account_part3[0] == '\0'
+        || row->payee_account_no[0] == '\0'
+        || row->payee_name[0] == '\0'
+        || row->priority[0] == '\0'
+        || row->system_type[0] == '\0'
+        || row->amount[0] == '\0';
 }
 
 static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row)
@@ -57,6 +101,7 @@ static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row)
     snprintf(row->status, sizeof(row->status), "%s", CNAPS_STATUS_PENDING_REVIEW);
     snprintf(row->last_action, sizeof(row->last_action), "%s", "CREATE");
     snprintf(row->last_operator_no, sizeof(row->last_operator_no), "%s", row->operator_no);
+    row->version_no = 1;
 
     if (db_next_serial_no(row->work_date, row->branch_no, row->serial_no, sizeof(row->serial_no)) != 0) {
         snprintf(row->serial_no, sizeof(row->serial_no), "%s", "0002000");
@@ -69,14 +114,23 @@ void CNAPS5701E(TPSVCINFO *rqst)
 {
     FBFR32 *fbfr = (FBFR32 *)rqst->data;
     cnaps_voucher_row row = {0};
+    char bill_id[33] = {0};
 
     cnaps_log_service_start("CNAPS5701E");
     row_from_create_request(fbfr, &row);
-    if (row.work_date[0] == '\0' || row.payee_account_no[0] == '\0' || row.payee_name[0] == '\0' || row.amount[0] == '\0') {
+    snprintf(bill_id, sizeof(bill_id), "%s", row.bill_id);
+    if (row.work_date[0] == '\0' || required_field_missing(&row)) {
         cnaps_return_error(rqst, "2001", "required field missing");
         return;
     }
-    if (db_begin() != 0 || db_insert_voucher(&row) != 0 || db_commit() != 0) {
+    if (!valid_money(row.amount, 0) || !valid_money(row.fee_amount, 1)) {
+        cnaps_return_error(rqst, "2002", "invalid money");
+        return;
+    }
+    if (db_begin() != 0
+        || db_insert_voucher(&row) != 0
+        || db_find_voucher(bill_id, &row) != 0
+        || db_commit() != 0) {
         db_rollback();
         cnaps_return_error(rqst, "4001", "database error");
         return;

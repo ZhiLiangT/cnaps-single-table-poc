@@ -29,13 +29,19 @@ typedef struct {
     char voucher_no[65];
     char remark[513];
     char checker_no[17];
+    char checker_time[20];
     char review_comment[513];
     char reject_reason[201];
     char delete_reason[201];
     char delete_operator_no[17];
+    char delete_time[20];
     char last_action[33];
     char last_operator_no[17];
     char last_request_id[33];
+    char last_action_time[20];
+    char created_at[20];
+    char updated_at[20];
+    long version_no;
 } cnaps_voucher_row;
 
 int db_connect(void);

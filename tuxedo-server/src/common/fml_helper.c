@@ -81,13 +81,40 @@ void cnaps_put_voucher(FBFR32 *fbfr, const void *value)
     cnaps_put_string(fbfr, CNAPS_F_OPERATOR_NO, row->operator_no);
     cnaps_put_string(fbfr, CNAPS_F_SERIAL_NO, row->serial_no);
     cnaps_put_string(fbfr, CNAPS_F_BUSINESS_TYPE, row->business_type);
+    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_PART1, row->account_part1);
+    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_PART2, row->account_part2);
+    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_PART3, row->account_part3);
+    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_NAME, row->account_name);
+    cnaps_put_string(fbfr, CNAPS_F_PAYER_NAME, row->payer_name);
     cnaps_put_string(fbfr, CNAPS_F_PAYEE_ACCT, row->payee_account_no);
     cnaps_put_string(fbfr, CNAPS_F_PAYEE_NAME, row->payee_name);
+    cnaps_put_string(fbfr, CNAPS_F_PRIORITY, row->priority);
+    cnaps_put_string(fbfr, CNAPS_F_RECEIVE_BANK_NO, row->receive_bank_no);
+    cnaps_put_string(fbfr, CNAPS_F_RECEIVE_BANK_NAME, row->receive_bank_name);
+    cnaps_put_string(fbfr, CNAPS_F_SYSTEM_TYPE, row->system_type);
     cnaps_put_string(fbfr, CNAPS_F_AMOUNT, row->amount);
+    cnaps_put_string(fbfr, CNAPS_F_DEBIT_MODE, row->debit_mode);
+    cnaps_put_string(fbfr, CNAPS_F_FEE_AMOUNT, row->fee_amount);
+    cnaps_put_string(fbfr, CNAPS_F_FEE_CHARGE_MODE, row->fee_charge_mode);
+    cnaps_put_string(fbfr, CNAPS_F_SEND_MODE, row->send_mode);
+    cnaps_put_string(fbfr, CNAPS_F_FAX_FLAG, row->fax_flag);
+    cnaps_put_string(fbfr, CNAPS_F_VOUCHER_NO, row->voucher_no);
+    cnaps_put_string(fbfr, CNAPS_F_REMARK, row->remark);
     cnaps_put_string(fbfr, CNAPS_F_STATUS, row->status);
+    cnaps_put_string(fbfr, CNAPS_F_CHECKER_NO, row->checker_no);
+    cnaps_put_string(fbfr, CNAPS_F_CHECKER_TIME, row->checker_time);
     cnaps_put_string(fbfr, CNAPS_F_REJECT_REASON, row->reject_reason);
     cnaps_put_string(fbfr, CNAPS_F_REVIEW_COMMENT, row->review_comment);
+    cnaps_put_string(fbfr, CNAPS_F_DELETE_REASON, row->delete_reason);
+    cnaps_put_string(fbfr, CNAPS_F_DELETE_OPERATOR_NO, row->delete_operator_no);
+    cnaps_put_string(fbfr, CNAPS_F_DELETE_TIME, row->delete_time);
     cnaps_put_string(fbfr, CNAPS_F_LAST_ACTION, row->last_action);
+    cnaps_put_string(fbfr, CNAPS_F_LAST_OPERATOR_NO, row->last_operator_no);
+    cnaps_put_string(fbfr, CNAPS_F_LAST_REQUEST_ID, row->last_request_id);
+    cnaps_put_string(fbfr, CNAPS_F_LAST_ACTION_TIME, row->last_action_time);
+    cnaps_put_string(fbfr, CNAPS_F_CREATED_AT, row->created_at);
+    cnaps_put_string(fbfr, CNAPS_F_UPDATED_AT, row->updated_at);
+    cnaps_put_long(fbfr, CNAPS_F_VERSION_NO, row->version_no);
 }
 
 void cnaps_return_response(TPSVCINFO *rqst, int success, const char *resp_code, const char *resp_msg)

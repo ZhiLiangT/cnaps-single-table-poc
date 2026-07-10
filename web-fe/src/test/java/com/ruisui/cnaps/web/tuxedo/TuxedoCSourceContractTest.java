@@ -67,4 +67,41 @@ class TuxedoCSourceContractTest {
         assertThat(dbHelper)
             .contains("WORK_DATE=COALESCE(TO_DATE(:work_date, 'YYYY-MM-DD'), WORK_DATE)");
     }
+
+    @Test
+    void nativeLifecycleChecksStateAndDoesNotRejectSameOperator() throws Exception {
+        String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
+        String delete = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_delete.c"));
+        String review = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_review.c"));
+
+        assertThat(update).contains("CNAPS_STATUS_PENDING_REVIEW", "CNAPS_STATUS_REJECTED", "3003");
+        assertThat(delete).contains("CNAPS_STATUS_PENDING_REVIEW", "CNAPS_STATUS_REJECTED", "3003");
+        assertThat(review)
+            .contains("CNAPS_STATUS_PENDING_REVIEW", "3004")
+            .doesNotContain("3005", "strcmp(row.operator_no, row.checker_no)");
+    }
+
+    @Test
+    void nativeDetailAndFmlOutputCoverTheV03VoucherFields() throws Exception {
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+        String fml = Files.readString(root.resolve("tuxedo-server/src/common/fml_helper.c"));
+
+        assertThat(db).contains(
+            "ACCOUNT_PART1", "ACCOUNT_PART2", "ACCOUNT_PART3", "ACCOUNT_NAME", "PAYER_NAME",
+            "RECEIVE_BANK_NO", "RECEIVE_BANK_NAME", "FEE_AMOUNT", "DELETE_TIME", "VERSION_NO"
+        );
+        assertThat(fml).contains(
+            "CNAPS_F_ACCOUNT_PART1", "CNAPS_F_RECEIVE_BANK_NO", "CNAPS_F_FEE_AMOUNT",
+            "CNAPS_F_DELETE_TIME", "CNAPS_F_VERSION_NO"
+        );
+    }
+
+    @Test
+    void nativeCreateKeepsTheFindKeySeparateFromTheHydratedRow() throws Exception {
+        String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
+
+        assertThat(create)
+            .contains("char bill_id[33]", "db_find_voucher(bill_id, &row)")
+            .doesNotContain("db_find_voucher(row.bill_id, &row)");
+    }
 }

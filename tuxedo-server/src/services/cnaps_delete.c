@@ -16,20 +16,55 @@ void CNAPS5701D(TPSVCINFO *rqst)
 {
     FBFR32 *fbfr = (FBFR32 *)rqst->data;
     cnaps_voucher_row row = {0};
+    char bill_id[33] = {0};
+    char delete_reason[201] = {0};
+    char operator_no[17] = {0};
+    char request_id[33] = {0};
+    int rc;
 
     cnaps_log_service_start("CNAPS5701D");
-    get_field(fbfr, CNAPS_F_BILL_ID, row.bill_id, sizeof(row.bill_id));
-    get_field(fbfr, CNAPS_F_DELETE_REASON, row.delete_reason, sizeof(row.delete_reason));
-    get_field(fbfr, CNAPS_F_OPERATOR_NO, row.delete_operator_no, sizeof(row.delete_operator_no));
-    get_field(fbfr, CNAPS_F_OPERATOR_NO, row.last_operator_no, sizeof(row.last_operator_no));
-    get_field(fbfr, CNAPS_F_REQ_ID, row.last_request_id, sizeof(row.last_request_id));
-    snprintf(row.status, sizeof(row.status), "%s", CNAPS_STATUS_DELETED);
-    snprintf(row.last_action, sizeof(row.last_action), "%s", "DELETE");
-    if (row.bill_id[0] == '\0') {
+    get_field(fbfr, CNAPS_F_BILL_ID, bill_id, sizeof(bill_id));
+    if (bill_id[0] == '\0') {
         cnaps_return_error(rqst, "2001", "billId is required");
         return;
     }
-    if (db_begin() != 0 || db_update_voucher(&row) != 0 || db_commit() != 0) {
+
+    rc = db_find_voucher(bill_id, &row);
+    if (rc == 1) {
+        cnaps_return_error(rqst, "3001", "单据不存在");
+        return;
+    }
+    if (rc != 0) {
+        cnaps_return_error(rqst, "4001", "database error");
+        return;
+    }
+    if (strcmp(row.status, CNAPS_STATUS_PENDING_REVIEW) != 0
+        && strcmp(row.status, CNAPS_STATUS_REJECTED) != 0) {
+        cnaps_return_error(rqst, "3003", "当前状态不允许操作");
+        return;
+    }
+
+    get_field(fbfr, CNAPS_F_DELETE_REASON, delete_reason, sizeof(delete_reason));
+    get_field(fbfr, CNAPS_F_OPERATOR_NO, operator_no, sizeof(operator_no));
+    get_field(fbfr, CNAPS_F_REQ_ID, request_id, sizeof(request_id));
+    snprintf(row.delete_reason, sizeof(row.delete_reason), "%s", delete_reason);
+    snprintf(row.delete_operator_no, sizeof(row.delete_operator_no), "%s", operator_no);
+    snprintf(row.last_operator_no, sizeof(row.last_operator_no), "%s", operator_no);
+    snprintf(row.last_request_id, sizeof(row.last_request_id), "%s", request_id);
+    snprintf(row.status, sizeof(row.status), "%s", CNAPS_STATUS_DELETED);
+    snprintf(row.last_action, sizeof(row.last_action), "%s", "DELETE");
+
+    if (db_begin() != 0) {
+        cnaps_return_error(rqst, "4001", "database error");
+        return;
+    }
+    rc = db_update_voucher(&row);
+    if (rc == 1) {
+        db_rollback();
+        cnaps_return_error(rqst, "3001", "单据不存在");
+        return;
+    }
+    if (rc != 0 || db_find_voucher(bill_id, &row) != 0 || db_commit() != 0) {
         db_rollback();
         cnaps_return_error(rqst, "4001", "database error");
         return;

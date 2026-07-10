@@ -102,7 +102,14 @@ public class MockTuxedoClient implements TuxedoClient {
         String branchNo = text(request, "BRANCH_NO", "772");
         String billId = "B" + workDate.replace("-", "") + branchNo + serialNo;
 
-        Map<String, Object> voucher = new LinkedHashMap<>(request.fields());
+        Map<String, Object> voucher = new LinkedHashMap<>();
+        for (String field : BUSINESS_FIELDS) {
+            if (request.fields().containsKey(field)) {
+                voucher.put(field, request.fields().get(field));
+            }
+        }
+        voucher.put("OPERATOR_NO", text(request, "OPERATOR_NO"));
+        voucher.put("BRANCH_NO", branchNo);
         voucher.put("BILL_ID", billId);
         voucher.put("SERIAL_NO", serialNo);
         voucher.put("STATUS", "10_PENDING_REVIEW");
@@ -234,13 +241,11 @@ public class MockTuxedoClient implements TuxedoClient {
             .sorted(Comparator.comparing(voucher -> String.valueOf(voucher.get("BILL_ID"))))
             .map(voucher -> (Map<String, Object>) new LinkedHashMap<>(voucher))
             .toList();
-        int fromIndex = Math.min((pageNo - 1) * pageSize, matching.size());
-        int toIndex = Math.min(fromIndex + pageSize, matching.size());
         return Map.of(
             "PAGE_NO", pageNo,
             "PAGE_SIZE", pageSize,
             "TOTAL", matching.size(),
-            "RECORDS", matching.subList(fromIndex, toIndex)
+            "RECORDS", pageSlice(matching, pageNo, pageSize)
         );
     }
 
@@ -254,13 +259,11 @@ public class MockTuxedoClient implements TuxedoClient {
             .filter(bank -> matches(bank, "SYSTEM_TYPE", text(request, "SYSTEM_TYPE"), false))
             .map(bank -> (Map<String, Object>) new LinkedHashMap<>(bank))
             .toList();
-        int fromIndex = Math.min((pageNo - 1) * pageSize, matching.size());
-        int toIndex = Math.min(fromIndex + pageSize, matching.size());
         return Map.of(
             "PAGE_NO", pageNo,
             "PAGE_SIZE", pageSize,
             "TOTAL", matching.size(),
-            "RECORDS", matching.subList(fromIndex, toIndex)
+            "RECORDS", pageSlice(matching, pageNo, pageSize)
         );
     }
 
@@ -320,6 +323,9 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private boolean validMoney(String value, boolean zeroAllowed) {
+        if (value == null || !value.matches("[0-9]+(?:\\.[0-9]{1,2})?")) {
+            return false;
+        }
         try {
             BigDecimal amount = new BigDecimal(value);
             return amount.scale() <= 2 && (zeroAllowed ? amount.signum() >= 0 : amount.signum() > 0);
@@ -329,10 +335,13 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private boolean validWorkDate(String value) {
+        if (value == null || !value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
+            return false;
+        }
         try {
             LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
             return true;
-        } catch (DateTimeParseException | NullPointerException ex) {
+        } catch (DateTimeParseException ex) {
             return false;
         }
     }
@@ -372,12 +381,33 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private int pageNo(TuxedoRequest request) {
-        return Math.max(number(request.fields(), "PAGE_NO"), 1);
+        return positivePageValue(request.fields(), "PAGE_NO", 1);
     }
 
     private int pageSize(TuxedoRequest request) {
-        int value = number(request.fields(), "PAGE_SIZE");
-        return value <= 0 ? 10 : value;
+        return positivePageValue(request.fields(), "PAGE_SIZE", 10);
+    }
+
+    private int positivePageValue(Map<String, Object> fields, String key, int defaultValue) {
+        Object value = fields.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(String.valueOf(value));
+            return parsed > 0 ? parsed : defaultValue;
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    private List<Map<String, Object>> pageSlice(List<Map<String, Object>> records, int pageNo, int pageSize) {
+        long fromIndex = ((long) pageNo - 1L) * pageSize;
+        if (fromIndex >= records.size()) {
+            return List.of();
+        }
+        long toIndex = Math.min(fromIndex + (long) pageSize, records.size());
+        return records.subList((int) fromIndex, (int) toIndex);
     }
 
     private int number(Map<String, Object> fields, String key) {

@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 class MockTuxedoClientV03ContractTest {
     private final MockTuxedoClient client = new MockTuxedoClient();
@@ -17,6 +19,66 @@ class MockTuxedoClientV03ContractTest {
             .isEqualTo("2002");
         assertThat(client.call("CNAPS5701E", request(Map.of("AMOUNT", "1.001"))).respCode())
             .isEqualTo("2002");
+    }
+
+    @Test
+    void rejectsScientificNotationAmountOnCreate() {
+        assertThat(client.call("CNAPS5701E", request(Map.of("AMOUNT", "1E+3"))).respCode())
+            .isEqualTo("2002");
+    }
+
+    @Test
+    void rejectsScientificNotationAmountOnUpdate() {
+        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
+
+        assertThat(client.call(
+            "CNAPS5701U",
+            request(Map.of("BILL_ID", created.fields().get("BILL_ID"), "AMOUNT", "1E+3"))
+        ).respCode()).isEqualTo("2002");
+    }
+
+    @Test
+    void rejectsInvalidFeeAmountsOnCreateAndUpdate() {
+        assertThat(client.call("CNAPS5701E", request(Map.of("FEE_AMOUNT", "-0.01"))).respCode())
+            .isEqualTo("2002");
+        assertThat(client.call("CNAPS5701E", request(Map.of("FEE_AMOUNT", "0.001"))).respCode())
+            .isEqualTo("2002");
+
+        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
+        assertThat(client.call(
+            "CNAPS5701U",
+            request(Map.of("BILL_ID", created.fields().get("BILL_ID"), "FEE_AMOUNT", "1E+3"))
+        ).respCode()).isEqualTo("2002");
+    }
+
+    @Test
+    void createIgnoresClientSuppliedAuditAndResponseFields() {
+        TuxedoResponse created = client.call(
+            "CNAPS5701E",
+            request(Map.ofEntries(
+                Map.entry("BILL_ID", "CLIENT-BILL"),
+                Map.entry("SERIAL_NO", "9999999"),
+                Map.entry("STATUS", "40_DELETED"),
+                Map.entry("VERSION_NO", 99),
+                Map.entry("CREATED_AT", "client-created-at"),
+                Map.entry("LAST_ACTION", "CLIENT-ACTION"),
+                Map.entry("CHECKER_NO", "CLIENT-CHECKER"),
+                Map.entry("DELETE_TIME", "client-delete-time"),
+                Map.entry("CLIENT_ONLY_FIELD", "client-only")
+            ))
+        );
+
+        assertThat(created.respCode()).isEqualTo("0000");
+        assertThat(created.fields())
+            .doesNotContainKeys("CHECKER_NO", "DELETE_TIME", "CLIENT_ONLY_FIELD")
+            .containsEntry("STATUS", "10_PENDING_REVIEW")
+            .containsEntry("VERSION_NO", 1)
+            .containsEntry("LAST_ACTION", "CREATE")
+            .containsEntry("OPERATOR_NO", "77210021")
+            .containsEntry("BRANCH_NO", "772");
+        assertThat(created.fields().get("BILL_ID")).isNotEqualTo("CLIENT-BILL");
+        assertThat(created.fields().get("SERIAL_NO")).isNotEqualTo("9999999");
+        assertThat(created.fields().get("CREATED_AT")).isNotEqualTo("client-created-at");
     }
 
     @Test
@@ -113,6 +175,99 @@ class MockTuxedoClientV03ContractTest {
         assertThat(records(firstPage)).extracting(record -> record.get("BILL_ID"))
             .containsExactly(first.fields().get("BILL_ID"));
         assertThat(records(secondPage)).extracting(record -> record.get("BILL_ID"))
+            .containsExactly(second.fields().get("BILL_ID"));
+    }
+
+    @Test
+    void largeVoucherPageOffsetDoesNotWrap() {
+        client.call("CNAPS5701E", request(Map.of()));
+
+        Map<String, Object> page = page(client.call(
+            "CNAPS4609Q",
+            request(Map.of("PAGE_NO", "65537", "PAGE_SIZE", "65536"))
+        ));
+
+        assertThat(page).containsEntry("PAGE_NO", 65537).containsEntry("PAGE_SIZE", 65536).containsEntry("TOTAL", 1);
+        assertThat(records(page)).isEmpty();
+    }
+
+    @Test
+    void largeBankPageOffsetDoesNotWrap() {
+        Map<String, Object> page = page(client.call(
+            "BANKQRY",
+            request(Map.of("PAGE_NO", "65537", "PAGE_SIZE", "65536"))
+        ));
+
+        assertThat(page).containsEntry("PAGE_NO", 65537).containsEntry("PAGE_SIZE", 65536).containsEntry("TOTAL", 1);
+        assertThat(records(page)).isEmpty();
+    }
+
+    @Test
+    void malformedVoucherPageValuesUseSafeDefaults() {
+        client.call("CNAPS5701E", request(Map.of()));
+
+        TuxedoResponse response = callWithoutThrowing(
+            "CNAPS4609Q",
+            Map.of("PAGE_NO", "2147483648", "PAGE_SIZE", "not-a-number")
+        );
+
+        assertThat(page(response)).containsEntry("PAGE_NO", 1).containsEntry("PAGE_SIZE", 10).containsEntry("TOTAL", 1);
+        assertThat(records(page(response))).hasSize(1);
+    }
+
+    @Test
+    void malformedBankPageValuesUseSafeDefaults() {
+        TuxedoResponse response = callWithoutThrowing(
+            "BANKQRY",
+            Map.of("PAGE_NO", "not-a-number", "PAGE_SIZE", "2147483648")
+        );
+
+        assertThat(page(response)).containsEntry("PAGE_NO", 1).containsEntry("PAGE_SIZE", 10).containsEntry("TOTAL", 1);
+        assertThat(records(page(response))).hasSize(1);
+    }
+
+    @Test
+    void generalQueryFiltersByVoucherNumberExactly() {
+        TuxedoResponse first = client.call("CNAPS5701E", request(Map.of("VOUCHER_NO", "PZ-001")));
+        client.call("CNAPS5701E", request(Map.of("VOUCHER_NO", "PZ-002")));
+
+        List<Map<String, Object>> records = records(page(client.call(
+            "CNAPS4609Q",
+            request(Map.of("VOUCHER_NO", "PZ-001"))
+        )));
+
+        assertThat(records).extracting(record -> record.get("BILL_ID"))
+            .containsExactly(first.fields().get("BILL_ID"));
+    }
+
+    @Test
+    void generalQueryFiltersBySerialNumberExactly() {
+        TuxedoResponse first = client.call("CNAPS5701E", request(Map.of()));
+        client.call("CNAPS5701E", request(Map.of()));
+
+        List<Map<String, Object>> records = records(page(client.call(
+            "CNAPS4609Q",
+            request(Map.of("SERIAL_NO", first.fields().get("SERIAL_NO")))
+        )));
+
+        assertThat(records).extracting(record -> record.get("BILL_ID"))
+            .containsExactly(first.fields().get("BILL_ID"));
+    }
+
+    @Test
+    void generalQueryFiltersByPayeeAccountExactly() {
+        client.call("CNAPS5701E", request(Map.of()));
+        TuxedoResponse second = client.call(
+            "CNAPS5701E",
+            request(Map.of("PAYEE_ACCT", "622200000000000002"))
+        );
+
+        List<Map<String, Object>> records = records(page(client.call(
+            "CNAPS4609Q",
+            request(Map.of("PAYEE_ACCT", "622200000000000002"))
+        )));
+
+        assertThat(records).extracting(record -> record.get("BILL_ID"))
             .containsExactly(second.fields().get("BILL_ID"));
     }
 
@@ -237,6 +392,26 @@ class MockTuxedoClientV03ContractTest {
         assertThat(records(page(response))).isEmpty();
     }
 
+    @Test
+    void bankQueryAppliesKeywordCityAndSystemFilters() {
+        assertThat(records(page(client.call(
+            "BANKQRY",
+            request(Map.of("KEYWORD", "接收", "CITY", "上海", "SYSTEM_TYPE", "CNAPS"))
+        )))).hasSize(1);
+        assertThat(records(page(client.call(
+            "BANKQRY",
+            request(Map.of("KEYWORD", "不匹配"))
+        )))).isEmpty();
+        assertThat(records(page(client.call(
+            "BANKQRY",
+            request(Map.of("CITY", "北京"))
+        )))).isEmpty();
+        assertThat(records(page(client.call(
+            "BANKQRY",
+            request(Map.of("SYSTEM_TYPE", "HVPS"))
+        )))).isEmpty();
+    }
+
     private TuxedoRequest request(Map<String, ?> overrides) {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("REQ_ID", "REQ-POC");
@@ -269,5 +444,12 @@ class MockTuxedoClientV03ContractTest {
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> dictionaryItems(TuxedoResponse response) {
         return (List<Map<String, Object>>) response.fields().get("_DATA");
+    }
+
+    private TuxedoResponse callWithoutThrowing(String serviceName, Map<String, ?> overrides) {
+        AtomicReference<TuxedoResponse> response = new AtomicReference<>();
+        assertThatCode(() -> response.set(client.call(serviceName, request(overrides))))
+            .doesNotThrowAnyException();
+        return response.get();
     }
 }

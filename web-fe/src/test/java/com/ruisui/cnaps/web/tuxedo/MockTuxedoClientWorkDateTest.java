@@ -29,6 +29,30 @@ class MockTuxedoClientWorkDateTest {
     }
 
     @Test
+    void rejectsExtendedYearWorkDateOnCreate() {
+        assertThat(client.call(
+            "CNAPS5701E",
+            request(Map.of("WORK_DATE", "+10000-01-01"))
+        ).respCode()).isEqualTo("2002");
+    }
+
+    @Test
+    void rejectsExtendedYearWorkDateOnUpdate() {
+        TuxedoResponse created = client.call(
+            "CNAPS5701E",
+            request(Map.of("WORK_DATE", "2026-07-10"))
+        );
+
+        assertThat(client.call(
+            "CNAPS5701U",
+            request(Map.of(
+                "BILL_ID", created.fields().get("BILL_ID"),
+                "WORK_DATE", "+10000-01-01"
+            ))
+        ).respCode()).isEqualTo("2002");
+    }
+
+    @Test
     void updatesWorkDateWithoutChangingBillOrSerialNumber() {
         TuxedoResponse created = client.call(
             "CNAPS5701E",

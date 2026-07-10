@@ -24,6 +24,7 @@ abstract class BaseJsonServlet extends HttpServlet {
     protected TuxedoRequestMapper requestMapper;
     private TuxedoResponseMapper responseMapper;
     private String operatorNo;
+    private String branchNo;
 
     @Override
     public void init() throws ServletException {
@@ -33,16 +34,17 @@ abstract class BaseJsonServlet extends HttpServlet {
         this.requestMapper = new TuxedoRequestMapper();
         this.responseMapper = new TuxedoResponseMapper();
         this.operatorNo = config.pocOperatorNo();
+        this.branchNo = config.pocBranchNo();
     }
 
     protected void callTuxedo(HttpServletRequest request, HttpServletResponse response, Map<String, Object> fields)
         throws IOException {
-        String requestId = RequestSupport.requestId(request);
+        String requestId = RequestSupport.newRequestId();
         TuxedoRequest tuxedoRequest = requestMapper.from(
             requestId,
             operatorNo,
-            RequestSupport.branchNo(request),
-            RequestSupport.workDate(request),
+            branchNo,
+            null,
             fields
         );
         TuxedoResponse tuxedoResponse = tuxedoClient.call(

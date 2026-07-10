@@ -10,6 +10,39 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TuxedoRuntimeConfigTest {
     @Test
+    void resolvesPocBranchNumberFromRuntimeSourcesAndDefault() {
+        Properties appProperties = new Properties();
+        appProperties.setProperty("webfe.poc.branchNo", "APP-BRANCH");
+
+        TuxedoRuntimeConfig fromSystem = TuxedoRuntimeConfig.resolve(
+            appProperties,
+            key -> "webfe.poc.branchNo".equals(key) ? "SYS-BRANCH" : null,
+            env(Map.of("POC_BRANCH_NO", "ENV-BRANCH")),
+            key -> "poc.branchNo".equals(key) ? "CTX-BRANCH" : null
+        );
+        assertThat(fromSystem.pocBranchNo()).isEqualTo("SYS-BRANCH");
+
+        TuxedoRuntimeConfig fromEnvironment = TuxedoRuntimeConfig.resolve(
+            appProperties, key -> null, env(Map.of("POC_BRANCH_NO", "ENV-BRANCH")),
+            key -> "poc.branchNo".equals(key) ? "CTX-BRANCH" : null);
+        assertThat(fromEnvironment.pocBranchNo()).isEqualTo("ENV-BRANCH");
+
+        TuxedoRuntimeConfig fromProperties = TuxedoRuntimeConfig.resolve(
+            appProperties, key -> null, env(Map.of()),
+            key -> "poc.branchNo".equals(key) ? "CTX-BRANCH" : null);
+        assertThat(fromProperties.pocBranchNo()).isEqualTo("APP-BRANCH");
+
+        TuxedoRuntimeConfig fromContext = TuxedoRuntimeConfig.resolve(
+            new Properties(), key -> null, env(Map.of()),
+            key -> "poc.branchNo".equals(key) ? "CTX-BRANCH" : null);
+        assertThat(fromContext.pocBranchNo()).isEqualTo("CTX-BRANCH");
+
+        TuxedoRuntimeConfig defaults = TuxedoRuntimeConfig.resolve(
+            new Properties(), key -> null, env(Map.of()), key -> null);
+        assertThat(defaults.pocBranchNo()).isEqualTo("772");
+    }
+
+    @Test
     void resolvesPocOperatorNumberFromRuntimeSourcesAndDefault() {
         Properties appProperties = new Properties();
         appProperties.setProperty("webfe.poc.operatorNo", "APP-OP");

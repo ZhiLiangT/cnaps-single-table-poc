@@ -27,7 +27,7 @@ class BaseJsonServletTest {
     Path tempDir;
 
     @Test
-    void usesServerConfiguredOperatorInsteadOfHttpHeader() throws Exception {
+    void usesServerGeneratedRequestContextInsteadOfHttpHeaders() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         TuxedoClient client = (serviceName, request) -> {
             captured.set(request);
@@ -35,6 +35,7 @@ class BaseJsonServletTest {
         };
         ServletContext context = servletContext(Map.of(
             "poc.operatorNo", "SERVER-OP",
+            "poc.branchNo", "SERVER-BRANCH",
             "webfe.config", tempDir.resolve("missing-app.properties").toString()
         ));
         context.setAttribute(TuxedoClient.class.getName(), client);
@@ -42,13 +43,23 @@ class BaseJsonServletTest {
         HealthServlet servlet = new HealthServlet();
         servlet.init(servletConfig(context));
         servlet.doGet(
-            request(Map.of("operatorNo", "CLIENT-OP")),
+            request(Map.of(
+                "requestId", "CLIENT-REQ",
+                "operatorNo", "CLIENT-OP",
+                "branchNo", "CLIENT-BRANCH",
+                "workDate", "2026-07-08"
+            )),
             response(new ByteArrayOutputStream())
         );
 
         assertThat(captured.get().fields())
             .containsEntry("OPERATOR_NO", "SERVER-OP")
-            .doesNotContainValue("CLIENT-OP");
+            .containsEntry("BRANCH_NO", "SERVER-BRANCH")
+            .doesNotContainValue("CLIENT-OP")
+            .doesNotContainValue("CLIENT-BRANCH")
+            .doesNotContainValue("CLIENT-REQ")
+            .doesNotContainKey("WORK_DATE");
+        assertThat(captured.get().fields().get("REQ_ID").toString()).startsWith("REQ-");
     }
 
     private ServletContext servletContext(Map<String, String> initParameters) {

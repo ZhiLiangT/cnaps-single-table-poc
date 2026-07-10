@@ -1,122 +1,82 @@
-# CNAPS Runtime Automation Design
+# CNAPS 运行环境自动化设计
 
-## Goal
+## 目标
 
-Provide a repeatable operational interface for the VM deployment at
-`/home/tian/cnaps-single-table-poc`. Operators should be able to rebuild,
-deploy, start, stop, inspect, and verify the Oracle XE -> Tuxedo/Jolt -> Tomcat
-stack without manually replaying the individual project scripts.
+为虚拟机上 `/home/tian/cnaps-single-table-poc` 项目提供可重复执行的统一运维入口。操作人员无需逐条执行已有脚本，即可完成 Oracle XE、Tuxedo/Jolt 和 Tomcat 整套链路的重新编译、部署、启动、停止、状态检查和验证。
 
-The automation must preserve the VM-local `conf/db.env`, must not initialize
-or recreate database objects during normal operation, and must fail visibly
-when any required service or health check is unavailable.
+自动化必须保留虚拟机本地的 `conf/db.env`，日常操作不得初始化或重建数据库对象；任何必要服务或健康检查不可用时，脚本必须明确失败并返回非零退出码。
 
-## Selected Approach
+## 方案选择
 
-Use a repository-owned command controller plus thin convenience scripts, and
-install a small systemd unit for boot ordering. This combines the useful parts
-of the alternatives considered:
+采用“仓库内统一控制脚本 + 便捷入口脚本 + systemd 开机编排”的组合方案。该方案吸收了以下几种方式的优点：
 
-- Script-only automation is easy to debug but does not recover after a VM boot.
-- Systemd-only automation starts services but is a poor interface for builds and deployments.
-- The selected hybrid keeps build/deploy logic in scripts while systemd delegates Tuxedo lifecycle to those same scripts.
+- 只使用脚本容易调试，但虚拟机重启后不能自动恢复服务。
+- 只使用 systemd 可以启动服务，但不适合承担编译和部署操作。
+- 组合方案把编译部署逻辑保留在项目脚本中，systemd 也调用相同的 Tuxedo 启停脚本，避免维护两套运行逻辑。
 
-## Command Interface
+## 命令接口
 
-Add a single `scripts/cnapsctl.sh` entry point with these commands:
+新增统一入口 `scripts/cnapsctl.sh`，支持以下命令：
 
-- `up`: start Oracle XE, Tuxedo, and Tomcat in dependency order; skip services
-  that are already healthy.
-- `down`: stop Tomcat and Tuxedo in reverse order. Oracle remains running by
-  default to avoid unnecessary database shutdowns; `down --all` also stops XE.
-- `restart`: perform `down` followed by `up`.
-- `status`: show systemd service states, expected listener ports, Tuxedo server
-  status, and the HTTP health response.
-- `health`: call the WebFE health endpoint and fail unless HTTP succeeds,
-  `respCode` is `0000`, and Oracle/Tuxedo/WebFE are all `UP`.
-- `rebuild-deploy`: run preflight, stop the application tier, build the C
-  server, load Jolt metadata and TUXCONFIG, build/test the WAR, deploy it, start
-  the stack, and run the health check.
-- `logs`: print recent Tuxedo ULOG and Tomcat journal output.
-- `install-autostart`: install and enable the systemd integration through a
-  dedicated installer script.
+- `up`：按照依赖顺序启动 Oracle XE、Tuxedo 和 Tomcat；已经正常运行的服务直接跳过。
+- `down`：按照相反顺序停止 Tomcat 和 Tuxedo。默认保留 Oracle 运行，避免无必要地关闭数据库；使用 `down --all` 时同时停止 Oracle XE。
+- `restart`：依次执行 `down` 和 `up`。
+- `status`：显示 systemd 服务状态、预期端口、Tuxedo 服务状态以及 HTTP 健康接口响应。
+- `health`：调用 WebFE 健康接口；只有 HTTP 调用成功、`respCode` 为 `0000`，并且 Oracle、Tuxedo、WebFE 均为 `UP` 时才返回成功。
+- `rebuild-deploy`：执行环境预检、停止应用层、编译 C 服务、加载 Jolt 元数据和 TUXCONFIG、编译并测试 WAR、部署、启动整套服务，最后执行健康检查。
+- `logs`：输出最近的 Tuxedo ULOG 和 Tomcat journal 日志。
+- `install-autostart`：通过专用安装脚本安装并启用 systemd 开机自启配置。
 
-Add `scripts/up.sh`, `scripts/down.sh`, and `scripts/rebuild-deploy.sh` as thin
-wrappers so the common operations remain discoverable. All scripts derive
-`APP_HOME` from their own location, accept environment overrides, and use
-POSIX shell syntax compatible with Oracle Linux 8.
+新增 `scripts/up.sh`、`scripts/down.sh` 和 `scripts/rebuild-deploy.sh` 作为便捷入口，保证常用操作容易发现。所有脚本从自身位置计算 `APP_HOME`，允许通过环境变量覆盖配置，并使用 Oracle Linux 8 兼容的 POSIX Shell 语法。
 
-## Runtime Behavior
+## 运行行为
 
-The controller reuses the existing focused scripts rather than duplicating
-their build or Tuxedo configuration logic. It handles service state before
-calling them so repeated execution is safe:
+统一控制器复用现有的细分脚本，不重复实现编译或 Tuxedo 配置逻辑。调用细分脚本前先判断服务状态，保证重复执行安全：
 
-1. Ensure Oracle XE is active and `1521` is listening.
-2. Start Tuxedo only when its bulletin board/JSL is absent; verify `8000`.
-3. Start or restart Tomcat as required; verify `8080`.
-4. Poll the health endpoint for a bounded period before declaring success.
+1. 确认 Oracle XE 已启动并监听 `1521`。
+2. 仅在 Tuxedo bulletin board 或 JSL 不存在时启动 Tuxedo，并验证 `8000`。
+3. 根据操作需要启动或重启 Tomcat，并验证 `8080`。
+4. 在限定时间内轮询健康接口，成功后才宣告启动完成。
 
-`rebuild-deploy` never runs `init-db.sh`. It stops Tomcat and any active Tuxedo
-domain before replacing binaries or TUXCONFIG, then uses the existing build,
-metadata, configuration, and WAR deployment scripts. Failure exits non-zero,
-prints the failed stage, and points to `logs/ULOG*` and the Tomcat journal.
+`rebuild-deploy` 永远不执行 `init-db.sh`。替换二进制或 TUXCONFIG 前，它会停止 Tomcat 以及正在运行的 Tuxedo 域，然后依次调用现有的编译、元数据加载、配置加载和 WAR 部署脚本。任一步骤失败时立即以非零状态退出，显示失败阶段，并提示检查 `logs/ULOG*` 和 Tomcat journal。
 
-Sudo is used only for Oracle/Tomcat systemd operations, WAR installation, and
-systemd installation. The password is requested interactively and is never
-stored in the repository or scripts.
+只有 Oracle/Tomcat 的 systemd 操作、WAR 安装和 systemd 配置安装需要使用 sudo。密码仅由终端交互输入，不写入仓库或脚本。
 
-## Boot Automation
+## 开机自动化
 
-Add a templated `cnaps-tuxedo.service` installed as a `Type=oneshot` unit with
-`RemainAfterExit=yes`. It runs as the project owner, starts after and requires
-`oracle-xe-21c.service`, and delegates start/stop to the repository scripts.
+新增模板化的 `cnaps-tuxedo.service`，安装后作为 `Type=oneshot`、`RemainAfterExit=yes` 的 systemd 单元运行。该服务使用项目所有者账号启动，依赖并晚于 `oracle-xe-21c.service`，启停操作委托给仓库中的脚本。
 
-Install a Tomcat drop-in that requires and starts after `cnaps-tuxedo.service`.
-The installer resolves the current absolute project path and user, installs
-both files under `/etc/systemd/system`, reloads systemd, and enables Oracle XE,
-CNAPS Tuxedo, and Tomcat. Re-running the installer updates the managed files
-without touching unrelated systemd configuration.
+同时安装 Tomcat systemd drop-in，使 Tomcat 依赖并晚于 `cnaps-tuxedo.service` 启动。安装脚本根据当前项目绝对路径和用户生成配置，将相关文件安装到 `/etc/systemd/system`，执行 daemon reload，并启用 Oracle XE、CNAPS Tuxedo 和 Tomcat。重复运行安装脚本会更新其管理的文件，不修改无关的 systemd 配置。
 
-## Documentation And Prompt Control
+## 使用文档和提示词控制
 
-Add an operations guide covering one-time installation, full rebuild/deploy,
-daily lifecycle commands, status/health/log inspection, recovery, uninstall,
-and expected ports/URLs. It explicitly marks database initialization as a
-first-install-only action.
+新增运维使用文档，覆盖一次性安装、完整重新编译部署、日常启停、状态和健康检查、日志查看、故障恢复、卸载，以及预期端口和访问地址。文档必须明确标注：数据库初始化只能在首次安装时执行。
 
-The guide also provides ready-to-use Chinese Codex prompts for:
+文档同时提供可直接使用的中文 Codex 提示词，覆盖以下场景：
 
-- full build/deploy and end-to-end verification;
-- daily start, stop, restart, and status inspection;
-- log-based diagnosis without changing code;
-- safe code synchronization while preserving `conf/db.env`;
-- installation or repair of boot automation.
+- 完整编译部署并执行端到端验证；
+- 日常启动、停止、重启和状态检查；
+- 仅根据日志诊断问题，不修改代码；
+- 保留 `conf/db.env` 的安全代码同步；
+- 安装或修复开机自启配置。
 
-Prompts identify the VM address and project path, prohibit committing or
-printing secrets, and require the agent to report command evidence and any
-failed stage.
+所有提示词明确虚拟机地址和项目路径，禁止提交或输出敏感信息，并要求 Codex 报告关键命令证据和失败阶段。
 
-## Testing And Acceptance
+## 测试和验收
 
-Add shell contract tests that run with stubbed `sudo`, `systemctl`, Tuxedo
-commands, port checks, and HTTP responses. Tests cover command dispatch,
-service ordering, already-running idempotence, `down --all`, failed health,
-and early exit during rebuild/deploy. The tests must not contact the real VM.
+新增 Shell 契约测试，通过替代 `sudo`、`systemctl`、Tuxedo 命令、端口检查和 HTTP 响应运行，不连接真实虚拟机。测试覆盖命令分发、服务启动顺序、服务已启动时的幂等性、`down --all`、健康检查失败，以及重新编译部署中途失败后立即退出。
 
-Acceptance on the VM requires:
+虚拟机验收要求如下：
 
-- the shell contract tests and existing Maven tests pass;
-- `rebuild-deploy` produces the C server and WAR and ends with all three health
-  components `UP`;
-- repeated `up` succeeds without duplicate Tuxedo boot attempts;
-- systemd reports Oracle XE, CNAPS Tuxedo, and Tomcat active after reboot;
-- the Windows host can reach the health endpoint on port `8080`.
+- Shell 契约测试和现有 Maven 测试全部通过。
+- `rebuild-deploy` 能生成 C 服务和 WAR，并以 Oracle、Tuxedo、WebFE 均为 `UP` 结束。
+- 重复执行 `up` 不会重复启动 Tuxedo 域。
+- 虚拟机重启后，systemd 显示 Oracle XE、CNAPS Tuxedo 和 Tomcat 均处于活动状态。
+- Windows 本机可以通过 `8080` 端口访问健康接口。
 
-## Constraints
+## 约束
 
-- `conf/db.env` remains VM-local and is never committed, copied, or printed.
-- Database schema creation is outside normal automation.
-- Oracle stays bound to the existing local configuration; no new firewall rule
-  is added for `1521` or Jolt `8000`.
-- Existing granular scripts remain usable for diagnosis and manual recovery.
+- `conf/db.env` 始终保留在虚拟机本地，不提交、不复制、不输出。
+- 数据库 Schema 创建不属于日常自动化范围。
+- Oracle 保持当前本机连接配置，不为 `1521` 或 Jolt `8000` 新增防火墙开放规则。
+- 保留现有细分脚本，供问题诊断和手工恢复使用。

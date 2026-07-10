@@ -4,6 +4,7 @@ import com.ruisui.cnaps.web.tuxedo.TuxedoClient;
 import com.ruisui.cnaps.web.tuxedo.TuxedoRequest;
 import com.ruisui.cnaps.web.tuxedo.TuxedoResponse;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
@@ -14,6 +15,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -21,6 +23,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BaseJsonServletTest {
+    @TempDir
+    Path tempDir;
+
     @Test
     void usesServerConfiguredOperatorInsteadOfHttpHeader() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
@@ -28,7 +33,10 @@ class BaseJsonServletTest {
             captured.set(request);
             return TuxedoResponse.ok("healthy", Map.of());
         };
-        ServletContext context = servletContext(Map.of("poc.operatorNo", "SERVER-OP"));
+        ServletContext context = servletContext(Map.of(
+            "poc.operatorNo", "SERVER-OP",
+            "webfe.config", tempDir.resolve("missing-app.properties").toString()
+        ));
         context.setAttribute(TuxedoClient.class.getName(), client);
 
         HealthServlet servlet = new HealthServlet();

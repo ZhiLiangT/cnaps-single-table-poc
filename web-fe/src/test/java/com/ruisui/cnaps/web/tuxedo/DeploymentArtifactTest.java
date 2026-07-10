@@ -83,14 +83,36 @@ class DeploymentArtifactTest {
     }
 
     @Test
-    void deploymentArtifactsConfigureAndDocumentTheServerOperator() throws Exception {
+    void deploymentArtifactsConfigureTheServerOperatorAndBranch() throws Exception {
         assertThat(Files.readString(root.resolve("conf/app.properties")))
-            .contains("webfe.poc.operatorNo=77210021");
+            .contains(
+                "webfe.poc.operatorNo=77210021",
+                "webfe.poc.branchNo=772");
         assertThat(Files.readString(root.resolve("scripts/configure-tomcat.sh")))
-            .contains("POC_OPERATOR_NO", "-Dwebfe.poc.operatorNo=");
+            .contains(
+                "POC_OPERATOR_NO",
+                "POC_BRANCH_NO",
+                "-Dwebfe.poc.operatorNo=",
+                "-Dwebfe.poc.branchNo=");
+    }
+
+    @Test
+    void frontendApiDocumentsTheServerContextAndWorkDateContract() throws Exception {
         assertThat(Files.readString(root.resolve("docs/cnaps-frontend-api.md")))
-            .contains("POC_OPERATOR_NO", "webfe.poc.operatorNo")
-            .doesNotContain("| `operatorNo`", "-H \"operatorNo:");
+            .contains(
+                "POC_OPERATOR_NO",
+                "POC_BRANCH_NO",
+                "webfe.poc.operatorNo",
+                "workDate",
+                "创建时必填",
+                "修改时可选")
+            .doesNotContain(
+                "### 1.4 公共请求头",
+                "| `operatorNo`",
+                "-H \"requestId:",
+                "-H \"operatorNo:",
+                "-H \"branchNo:",
+                "-H \"workDate:");
     }
 
     @Test

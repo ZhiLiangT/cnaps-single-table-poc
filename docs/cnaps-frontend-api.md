@@ -1,6 +1,6 @@
 # CNAPS POC 前端 HTTP API 文档
 
-版本日期：2026-07-09
+版本日期：2026-07-10
 
 适用范围：当前 `cnaps-single-table-poc` WebFE/Tomcat WAR，通过 Jolt 调用 Tuxedo C 服务，再访问本机 Oracle XE。
 
@@ -34,17 +34,15 @@ Content-Type: application/json
 
 当前 WAR 未配置 CORS。前端如果不是同源部署，需要使用开发代理，或后续在 WebFE 增加 CORS Filter。
 
-### 1.4 公共请求头
+### 1.4 服务器请求上下文
 
-所有 `/api/*` 接口都会把以下上下文放入 Tuxedo 请求字段。
+业务请求上下文由 WebFE 在服务器端提供，不接受浏览器通过公共请求头覆盖：
 
-| Header | 必填 | 默认值 | 示例 | 说明 |
-| --- | --- | --- | --- | --- |
-| `requestId` | 否 | `REQ-<timestamp>` | `REQ-FE-202607090001` | 请求流水号。也支持 `X-Request-Id` 作为备用头。当前响应不回传该字段。 |
-| `branchNo` | 否 | `772` | `772` | 机构号。 |
-| `workDate` | 否 | 当前日期 | `2026-07-09` | 工作日期，建议格式 `yyyy-MM-dd`。 |
+- `requestId`：WebFE 为每次请求生成 `REQ-<timestamp>` 形式的内部请求流水号，当前响应不回传该字段。
+- `operatorNo`：使用系统属性或应用配置 `webfe.poc.operatorNo`、环境变量 `POC_OPERATOR_NO`、Servlet Context 参数 `poc.operatorNo`，默认值为 `77210021`。
+- `branchNo`：使用系统属性或应用配置 `webfe.poc.branchNo`、环境变量 `POC_BRANCH_NO`、Servlet Context 参数 `poc.branchNo`，默认值为 `772`。
 
-操作员号由 WebFE 的服务器上下文固定解析：使用 `webfe.poc.operatorNo` / `POC_OPERATOR_NO` 配置，默认值为 `77210021`，浏览器请求不能覆盖该值。WebFE 仍会向 Tuxedo 转发内部字段 `OPERATOR_NO`，用于凭证创建和审计持久化。
+WebFE 会向 Tuxedo 转发内部字段 `REQUEST_ID`、`OPERATOR_NO` 和 `BRANCH_NO`，用于请求跟踪、凭证创建和审计持久化。
 
 ### 1.5 公共响应结构
 
@@ -118,10 +116,11 @@ Content-Type: application/json
 
 ### 3.1 凭证创建请求字段
 
-`POST /api/cnaps/vouchers` 使用以下 JSON 字段。当前后端硬校验只要求 `payeeAccountNo`、`payeeName`、`amount` 非空；但前端录入页建议按“前端建议必填”列做表单校验。
+`POST /api/cnaps/vouchers` 使用以下 JSON 字段。当前后端硬校验要求 `workDate`、`payeeAccountNo`、`payeeName`、`amount` 非空；前端录入页还应按“前端建议必填”列做表单校验。
 
 | JSON 字段 | 类型 | 后端必填 | 前端建议必填 | 默认值 | 示例 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `workDate` | string | 是 | 是 | 无 | `2026-07-09` | 工作日期，格式 `yyyy-MM-dd`；创建时必填。 |
 | `businessType` | string | 否 | 是 | `02102` | `02102` | 业务类型。 |
 | `accountPart1` | string | 否 | 是 | 空 | `404045` | 付款账号组成部分 1。 |
 | `accountPart2` | string | 否 | 是 | 空 | `00772` | 付款账号组成部分 2。 |
@@ -151,6 +150,7 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | `billId` | string | 创建、详情、修改、删除、复核 | 凭证编号，格式类似 `B202607097720002004`。 |
 | `serialNo` | string | 创建、详情 | 机构工作日流水号。 |
+| `workDate` | string | 创建、详情、修改 | 工作日期，格式 `yyyy-MM-dd`。 |
 | `status` | string | 创建、详情、修改、删除、复核、列表查询回显 | 凭证状态。 |
 | `businessType` | string | 创建回显 | 业务类型。 |
 | `accountPart1` | string | 创建回显 | 付款账号组成部分 1。 |
@@ -294,6 +294,7 @@ GET /api/cnaps/vouchers?status=10_PENDING_REVIEW&pageNo=1&pageSize=10
 
 | 参数 | 必填 | 示例 | 说明 |
 | --- | --- | --- | --- |
+| `workDate` | 否 | `2026-07-09` | 工作日期过滤；未传时默认当前日期。 |
 | `status` | 否 | `10_PENDING_REVIEW` | 按状态计数。 |
 | `pageNo` / `page` | 否 | `1` | 会传入 Tuxedo，但当前 C 服务不实际分页。 |
 | `pageSize` / `size` | 否 | `10` | 会传入 Tuxedo，但当前 C 服务不实际分页。 |
@@ -301,11 +302,7 @@ GET /api/cnaps/vouchers?status=10_PENDING_REVIEW&pageNo=1&pageSize=10
 | `serialNo` | 否 | `0002004` | WebFE 可映射字段，但当前 C 服务不使用。 |
 | `includeDeleted` | 否 | `false` | WebFE 可映射字段，但当前 C 服务不使用。 |
 
-实际过滤条件：
-
-- `workDate`：来自公共请求头，默认当前日期。
-- `branchNo`：来自公共请求头，默认 `772`。
-- `status`：来自查询参数，可为空。
+实际过滤条件还使用服务器配置的 `branchNo`（默认 `772`）；`status` 来自查询参数，可为空。
 
 当前成功响应：
 
@@ -334,6 +331,7 @@ Content-Type: application/json
 
 ```json
 {
+  "workDate": "2026-07-09",
   "payeeAccountNo": "622200000000000001",
   "payeeName": "Payee Name",
   "amount": "5600.00",
@@ -367,6 +365,7 @@ Content-Type: application/json
   "data": {
     "billId": "B202607097720002004",
     "serialNo": "0002004",
+    "workDate": "2026-07-09",
     "status": "10_PENDING_REVIEW",
     "payeeAccountNo": "622200000000000001",
     "payeeName": "Payee Name",
@@ -390,7 +389,7 @@ Content-Type: application/json
 
 | 场景 | HTTP 状态 | respCode | 说明 |
 | --- | --- | --- | --- |
-| `payeeAccountNo`、`payeeName` 或 `amount` 为空 | 400 | `2001` | 返回 `required field missing`。 |
+| `workDate`、`payeeAccountNo`、`payeeName` 或 `amount` 为空 | 400 | `2001` | 返回 `required field missing`。 |
 | Oracle DML 失败 | 500 | `4001` | 金额格式无法转数字等也可能进入该错误。 |
 
 ### 5.6 待复核列表查询
@@ -403,14 +402,11 @@ GET /api/cnaps/vouchers/review-list?pageNo=1&pageSize=10
 
 | 参数 | 必填 | 示例 | 说明 |
 | --- | --- | --- | --- |
+| `workDate` | 否 | `2026-07-09` | 工作日期过滤；未传时默认当前日期。 |
 | `pageNo` / `page` | 否 | `1` | 会传入 Tuxedo，当前 C 服务不实际分页。 |
 | `pageSize` / `size` | 否 | `10` | 会传入 Tuxedo，当前 C 服务不实际分页。 |
 
-实际过滤条件：
-
-- `workDate`：来自公共请求头，默认当前日期。
-- `branchNo`：来自公共请求头，默认 `772`。
-- `status`：固定为 `10_PENDING_REVIEW`。
+实际过滤条件还使用服务器配置的 `branchNo`（默认 `772`），`status` 固定为 `10_PENDING_REVIEW`。
 
 当前成功响应：
 
@@ -480,6 +476,7 @@ Content-Type: application/json
 
 ```json
 {
+  "workDate": "2026-07-10",
   "payeeAccountNo": "622200000000000456",
   "payeeName": "Updated Payee",
   "amount": "56.78",
@@ -491,6 +488,7 @@ Content-Type: application/json
 
 | JSON 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
+| `workDate` | string | 否 | 工作日期，格式 `yyyy-MM-dd`；修改时可选。传入时更新工作日期，不传时保持原值。 |
 | `payeeAccountNo` | string | 否 | 收款账号。 |
 | `payeeName` | string | 否 | 收款人名称。 |
 | `amount` | string | 否 | 金额。 |
@@ -501,6 +499,7 @@ Content-Type: application/json
 - 状态置为 `10_PENDING_REVIEW`。
 - 数据库 `lastAction` 置为 `UPDATE`。
 - 数据库版本号加 1。
+- 修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
 
 当前成功响应：
 
@@ -510,6 +509,7 @@ Content-Type: application/json
   "respMsg": "update success",
   "data": {
     "billId": "B202607097720002004",
+    "workDate": "2026-07-10",
     "status": "10_PENDING_REVIEW",
     "payeeAccountNo": "622200000000000456",
     "payeeName": "Updated Payee",
@@ -688,10 +688,8 @@ curl "http://192.168.84.134:8080/ruisui-bank-sim/api/health"
 ```bash
 curl -X POST "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers" \
   -H "Content-Type: application/json" \
-  -H "requestId: REQ-FE-CREATE-001" \
-  -H "branchNo: 772" \
-  -H "workDate: 2026-07-09" \
   -d '{
+    "workDate": "2026-07-09",
     "payeeAccountNo": "622200000000000001",
     "payeeName": "Payee Name",
     "amount": "5600.00",
@@ -727,6 +725,7 @@ curl "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers/B20260709772
 curl -X PUT "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607097720002004" \
   -H "Content-Type: application/json" \
   -d '{
+    "workDate": "2026-07-10",
     "payeeAccountNo": "622200000000000456",
     "payeeName": "Updated Payee",
     "amount": "56.78",

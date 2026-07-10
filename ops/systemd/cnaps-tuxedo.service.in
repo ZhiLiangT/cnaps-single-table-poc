@@ -8,7 +8,7 @@ Before=tomcat.service
 Type=oneshot
 RemainAfterExit=yes
 User=@RUN_USER@
-SELinuxContext=unconfined_u:unconfined_r:unconfined_t:s0
+PAMName=login
 Environment=APP_HOME=@APP_HOME@
 WorkingDirectory=@APP_HOME@
 ExecStart=@APP_HOME@/scripts/cnapsctl.sh tuxedo-up

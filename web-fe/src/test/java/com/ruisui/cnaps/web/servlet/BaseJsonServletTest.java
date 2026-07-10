@@ -86,12 +86,25 @@ class BaseJsonServletTest {
             request(
                 "/api/cnaps/vouchers/review-list",
                 "/review-list",
+                Map.of(
+                    "requestId", "CLIENT-REQ",
+                    "operatorNo", "CLIENT-OP",
+                    "branchNo", "CLIENT-BRANCH",
+                    "workDate", "HEADER-WORK-DATE"
+                ),
                 Map.of("workDate", new String[] {"2026-07-08"})
             ),
             response(new ByteArrayOutputStream())
         );
 
-        assertThat(captured.get().fields()).containsEntry("WORK_DATE", "2026-07-08");
+        assertThat(captured.get().fields())
+            .containsEntry("WORK_DATE", "2026-07-08")
+            .containsEntry("OPERATOR_NO", "SERVER-OP")
+            .containsEntry("BRANCH_NO", "SERVER-BRANCH")
+            .doesNotContainValue("CLIENT-REQ")
+            .doesNotContainValue("CLIENT-OP")
+            .doesNotContainValue("CLIENT-BRANCH")
+            .doesNotContainValue("HEADER-WORK-DATE");
     }
 
     @Test
@@ -155,7 +168,17 @@ class BaseJsonServletTest {
     }
 
     private HttpServletRequest request(String uri, String pathInfo, Map<String, String[]> parameters) {
+        return request(uri, pathInfo, Map.of(), parameters);
+    }
+
+    private HttpServletRequest request(
+        String uri,
+        String pathInfo,
+        Map<String, String> headers,
+        Map<String, String[]> parameters
+    ) {
         return proxy(HttpServletRequest.class, (method, args) -> switch (method.getName()) {
+            case "getHeader" -> headers.get(String.valueOf(args[0]));
             case "getMethod" -> "GET";
             case "getRequestURI" -> uri;
             case "getContextPath" -> "";

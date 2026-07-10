@@ -33,8 +33,6 @@ public class TuxedoRequestMapper {
         Map.entry("rejectReason", "REJECT_REASON"),
         Map.entry("reviewComment", "REVIEW_COMMENT"),
         Map.entry("deleteReason", "DELETE_REASON"),
-        Map.entry("page", "PAGE_NO"),
-        Map.entry("size", "PAGE_SIZE"),
         Map.entry("pageNo", "PAGE_NO"),
         Map.entry("pageSize", "PAGE_SIZE"),
         Map.entry("includeDeleted", "INCLUDE_DELETED")

@@ -23,6 +23,9 @@
             <label>业务类型 <input name="businessType" required value="02102"></label>
             <label>优先级 <input name="priority" required value="NORM"></label>
             <label>系统类型 <input name="systemType" required value="CNAPS"></label>
+            <label>工作日期
+                <input type="date" name="workDate" required value="<%= java.time.LocalDate.now() %>">
+            </label>
         </div>
         <input type="hidden" name="accountPart1" value="404045">
         <input type="hidden" name="accountPart2" value="00772">

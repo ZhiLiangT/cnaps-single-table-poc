@@ -116,6 +116,17 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void createPageSubmitsWorkDateWithoutBusinessHeaders() throws Exception {
+        String page = Files.readString(root.resolve("web-fe/src/main/webapp/cnaps-create.jsp"));
+        String script = Files.readString(root.resolve("web-fe/src/main/webapp/static/js/cnaps.js"));
+
+        assertThat(page).contains("name=\"workDate\"");
+        assertThat(script)
+            .contains("Content-Type")
+            .doesNotContain("requestId:", "operatorNo:", "branchNo:", "workDate:");
+    }
+
+    @Test
     void operationsGuideDocumentsAutomationAndCredentialSafety() throws Exception {
         Path operationsGuide = root.resolve("docs/cnaps-operations.md");
 

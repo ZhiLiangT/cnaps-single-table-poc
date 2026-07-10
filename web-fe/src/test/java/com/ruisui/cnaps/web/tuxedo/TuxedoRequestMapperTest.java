@@ -71,4 +71,25 @@ class TuxedoRequestMapperTest {
             .doesNotContainValue("CLIENT-OP")
             .doesNotContainValue("CLIENT-BRANCH");
     }
+
+    @Test
+    void exposesOnlyV03PaginationNames() {
+        TuxedoRequest v03Request = mapper.from(
+            "SERVER-REQ",
+            "SERVER-OP",
+            "SERVER-BRANCH",
+            Map.of("pageNo", "2", "pageSize", "5")
+        );
+        TuxedoRequest legacyRequest = mapper.from(
+            "SERVER-REQ",
+            "SERVER-OP",
+            "SERVER-BRANCH",
+            Map.of("page", "9", "size", "99")
+        );
+
+        assertThat(v03Request.fields())
+            .containsEntry("PAGE_NO", "2")
+            .containsEntry("PAGE_SIZE", "5");
+        assertThat(legacyRequest.fields()).doesNotContainKeys("PAGE_NO", "PAGE_SIZE");
+    }
 }

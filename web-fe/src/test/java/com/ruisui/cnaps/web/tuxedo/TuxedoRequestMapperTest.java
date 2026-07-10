@@ -43,4 +43,19 @@ class TuxedoRequestMapperTest {
             .containsEntry("AMOUNT", "1.00")
             .containsEntry("PAYEE_ACCT", "622200000000000001");
     }
+
+    @Test
+    void keepsTrustedOperatorWhenBodyOrQueryContainsOperator() {
+        TuxedoRequest request = mapper.from(
+            "REQ",
+            "SERVER-OP",
+            "772",
+            "2026-07-10",
+            Map.of("operatorNo", "CLIENT-OP")
+        );
+
+        assertThat(request.fields())
+            .containsEntry("OPERATOR_NO", "SERVER-OP")
+            .doesNotContainValue("CLIENT-OP");
+    }
 }

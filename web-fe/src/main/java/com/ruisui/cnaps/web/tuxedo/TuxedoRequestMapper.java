@@ -87,18 +87,18 @@ public class TuxedoRequestMapper {
         Map<String, ?> body
     ) {
         Map<String, Object> fields = new LinkedHashMap<>();
-        putIfPresent(fields, "REQUEST_ID", requestId);
-        putIfPresent(fields, "REQ_ID", requestId);
-        putIfPresent(fields, "OPERATOR_NO", operatorNo);
-        putIfPresent(fields, "BRANCH_NO", branchNo);
-        putIfPresent(fields, "WORK_DATE", workDate);
-
         body.forEach((key, value) -> {
             if (value == null) {
                 return;
             }
             fields.put(BODY_FIELD_NAMES.getOrDefault(key, camelToFieldName(key)), value);
         });
+
+        putIfPresent(fields, "REQUEST_ID", requestId);
+        putIfPresent(fields, "REQ_ID", requestId);
+        putIfPresent(fields, "OPERATOR_NO", operatorNo);
+        putIfPresent(fields, "BRANCH_NO", branchNo);
+        putIfPresent(fields, "WORK_DATE", workDate);
         return new TuxedoRequest(fields);
     }
 

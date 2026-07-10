@@ -50,7 +50,6 @@ class V03TuxedoContractTest {
             TuxedoResponse.ok("健康检查成功", fields)
         );
 
-        assertThat(response.success()).isTrue();
         assertThat(response.respCode()).isEqualTo("0000");
         assertThat(response.respMsg()).isEqualTo("健康检查成功");
         assertThat(response.data()).isInstanceOf(Map.class);

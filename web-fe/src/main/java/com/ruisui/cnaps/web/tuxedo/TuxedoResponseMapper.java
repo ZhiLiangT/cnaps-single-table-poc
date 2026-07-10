@@ -68,9 +68,9 @@ public class TuxedoResponseMapper {
             Object data = response.fields().containsKey(DATA_FIELD)
                 ? mapValue(response.fields().get(DATA_FIELD))
                 : mapFields(response.fields());
-            return ApiResponse.ok(requestId, response.respMsg(), data);
+            return ApiResponse.ok(response.respMsg(), data);
         }
-        return ApiResponse.fail(requestId, response.respCode(), response.respMsg());
+        return ApiResponse.fail(response.respCode(), response.respMsg());
     }
 
     @SuppressWarnings("unchecked")

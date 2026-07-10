@@ -31,6 +31,29 @@ escape_sed_replacement() {
   printf '%s' "$1" | sed 's/[&|]/\\&/g'
 }
 
+set_fcontext() {
+  selinux_type=$1
+  path_pattern=$2
+  if ! as_root semanage fcontext -a -t "$selinux_type" "$path_pattern" 2>/dev/null; then
+    as_root semanage fcontext -m -t "$selinux_type" "$path_pattern"
+  fi
+}
+
+configure_selinux() {
+  if ! command -v getenforce >/dev/null 2>&1 || [ "$(getenforce)" = Disabled ]; then
+    return 0
+  fi
+  if ! command -v semanage >/dev/null 2>&1; then
+    echo "SELinux is enabled but semanage is unavailable; install policycoreutils-python-utils" >&2
+    exit 1
+  fi
+
+  set_fcontext usr_t "$APP_HOME(/.*)?"
+  set_fcontext bin_t "$APP_HOME/scripts(/.*)?"
+  set_fcontext bin_t "$APP_HOME/tuxedo-server/bin(/.*)?"
+  as_root restorecon -R "$APP_HOME"
+}
+
 require_file "$TUXEDO_TEMPLATE"
 require_file "$TOMCAT_TEMPLATE"
 
@@ -47,6 +70,7 @@ sed \
 as_root install -d -m 0755 "$SYSTEMD_ROOT" "$TOMCAT_DROPIN_DIR"
 as_root install -m 0644 "$rendered_unit" "$TUXEDO_UNIT"
 as_root install -m 0644 "$TOMCAT_TEMPLATE" "$TOMCAT_DROPIN"
+configure_selinux
 as_root systemctl daemon-reload
 as_root systemctl enable oracle-xe-21c cnaps-tuxedo tomcat
 

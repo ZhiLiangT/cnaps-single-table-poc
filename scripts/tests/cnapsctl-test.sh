@@ -133,6 +133,16 @@ cat > "$FAKE_BIN/sleep" <<'STUB'
 exit 0
 STUB
 
+cat > "$FAKE_BIN/getenforce" <<'STUB'
+#!/usr/bin/env sh
+echo Enforcing
+STUB
+
+cat > "$FAKE_BIN/restorecon" <<'STUB'
+#!/usr/bin/env sh
+echo "restorecon $*" >> "$CNAPS_TEST_LOG"
+STUB
+
 chmod +x "$FAKE_BIN"/*
 
 export APP_HOME=$FIXTURE_ROOT
@@ -215,5 +225,12 @@ if FAIL_STAGE=build-c run_ctl rebuild-deploy >/dev/null 2>&1; then
 fi
 assert_logged "script build-c"
 assert_not_logged "script load-jolt-metadata"
+
+unset FAIL_STAGE
+unset FAIL_HEALTH
+reset_fixture
+run_ctl rebuild-deploy >/dev/null
+assert_logged "restorecon -R $FIXTURE_ROOT"
+assert_order "script build-web" "restorecon -R $FIXTURE_ROOT" "script start-tuxedo"
 
 echo "PASS: cnapsctl lifecycle contract"

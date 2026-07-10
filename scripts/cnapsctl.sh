@@ -228,6 +228,14 @@ run_stage() {
   "$@"
 }
 
+restore_selinux_labels() {
+  if command -v getenforce >/dev/null 2>&1 &&
+      [ "$(getenforce)" != Disabled ] &&
+      command -v restorecon >/dev/null 2>&1; then
+    as_root restorecon -R "$APP_HOME"
+  fi
+}
+
 rebuild_deploy() {
   run_stage "preflight" "$SCRIPT_DIR/preflight.sh"
   stop_tomcat
@@ -237,6 +245,7 @@ rebuild_deploy() {
   run_stage "load TUXCONFIG" "$SCRIPT_DIR/load-tuxconfig.sh"
   run_stage "build WebFE WAR" "$SCRIPT_DIR/build-web.sh"
   run_stage "deploy WebFE WAR" "$SCRIPT_DIR/deploy-web.sh"
+  run_stage "restore SELinux labels" restore_selinux_labels
   up
 }
 

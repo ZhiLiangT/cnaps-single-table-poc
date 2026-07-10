@@ -32,6 +32,23 @@ set -eu
 echo "systemctl $*" >> "$CNAPS_TEST_LOG"
 STUB
 
+cat > "$FAKE_BIN/getenforce" <<'STUB'
+#!/usr/bin/env sh
+echo Enforcing
+STUB
+
+cat > "$FAKE_BIN/semanage" <<'STUB'
+#!/usr/bin/env sh
+set -eu
+echo "semanage $*" >> "$CNAPS_TEST_LOG"
+STUB
+
+cat > "$FAKE_BIN/restorecon" <<'STUB'
+#!/usr/bin/env sh
+set -eu
+echo "restorecon $*" >> "$CNAPS_TEST_LOG"
+STUB
+
 chmod +x "$FAKE_BIN"/*
 
 export PATH=$FAKE_BIN:$PATH
@@ -83,6 +100,10 @@ fi
 
 assert_logged "systemctl daemon-reload"
 assert_logged "systemctl enable oracle-xe-21c cnaps-tuxedo tomcat"
+assert_logged "semanage fcontext -a -t usr_t $PROJECT_ROOT(/.*)?"
+assert_logged "semanage fcontext -a -t bin_t $PROJECT_ROOT/scripts(/.*)?"
+assert_logged "semanage fcontext -a -t bin_t $PROJECT_ROOT/tuxedo-server/bin(/.*)?"
+assert_logged "restorecon -R $PROJECT_ROOT"
 
 first_checksum=$(cksum "$TUXEDO_UNIT" "$TOMCAT_DROPIN")
 : > "$LOG_FILE"

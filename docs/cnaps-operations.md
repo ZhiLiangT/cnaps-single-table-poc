@@ -80,7 +80,7 @@ chmod 600 conf/db.env
 oracle-xe-21c.service -> cnaps-tuxedo.service -> tomcat.service
 ```
 
-项目位于用户主目录且虚拟机启用了 SELinux Enforcing。`cnaps-tuxedo.service` 使用 `PAMName=login` 建立 `tian` 用户会话，使脚本在该用户正常的 SELinux 上下文中运行；该设置不会关闭或放宽全局 SELinux。
+项目位于用户主目录且虚拟机启用了 SELinux Enforcing。安装器使用 `PAMName=login` 建立 `tian` 用户会话，并为项目普通文件持久配置 `usr_t`、为 `scripts` 和 `tuxedo-server/bin` 配置 `bin_t`。完整部署在重建 C 服务后自动执行 `restorecon`；这些设置不会关闭全局 SELinux。
 
 检查启用状态：
 

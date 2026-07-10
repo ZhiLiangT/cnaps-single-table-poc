@@ -122,7 +122,7 @@ class DeploymentArtifactTest {
 
         assertThat(page).contains("name=\"workDate\"");
         assertThat(script)
-            .contains("Content-Type")
+            .contains("\"Content-Type\": \"application/json; charset=UTF-8\"")
             .doesNotContain("requestId:", "operatorNo:", "branchNo:", "workDate:");
     }
 

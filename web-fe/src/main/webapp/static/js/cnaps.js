@@ -1,6 +1,6 @@
 const result = document.querySelector("#result");
 
-const jsonHeaders = { "Content-Type": "application/json" };
+const jsonHeaders = { "Content-Type": "application/json; charset=UTF-8" };
 
 const show = async (response) => {
   const payload = await response.json();

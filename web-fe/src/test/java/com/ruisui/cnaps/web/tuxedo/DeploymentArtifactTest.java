@@ -68,4 +68,20 @@ class DeploymentArtifactTest {
         assertThat(tomcatConfig)
             .contains("-DTM_ALLOW_NOTLS=");
     }
+
+    @Test
+    void operationsGuideDocumentsAutomationAndCredentialSafety() throws Exception {
+        Path operationsGuide = root.resolve("docs/cnaps-operations.md");
+
+        assertThat(operationsGuide).exists();
+        String operations = Files.readString(operationsGuide);
+        assertThat(operations).contains(
+            "./scripts/rebuild-deploy.sh",
+            "./scripts/up.sh",
+            "./scripts/down.sh --all",
+            "./scripts/cnapsctl.sh install-autostart",
+            "不要提交、复制或输出 conf/db.env",
+            "192.168.84.134",
+            "/home/tian/cnaps-single-table-poc");
+    }
 }

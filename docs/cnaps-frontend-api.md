@@ -41,9 +41,10 @@ Content-Type: application/json
 | Header | 必填 | 默认值 | 示例 | 说明 |
 | --- | --- | --- | --- | --- |
 | `requestId` | 否 | `REQ-<timestamp>` | `REQ-FE-202607090001` | 请求流水号。也支持 `X-Request-Id` 作为备用头。当前响应不回传该字段。 |
-| `operatorNo` | 否 | `77210021` | `77210021` | 操作员号。 |
 | `branchNo` | 否 | `772` | `772` | 机构号。 |
 | `workDate` | 否 | 当前日期 | `2026-07-09` | 工作日期，建议格式 `yyyy-MM-dd`。 |
+
+操作员号由 WebFE 的服务器上下文固定解析：使用 `webfe.poc.operatorNo` / `POC_OPERATOR_NO` 配置，默认值为 `77210021`，浏览器请求不能覆盖该值。WebFE 仍会向 Tuxedo 转发内部字段 `OPERATOR_NO`，用于凭证创建和审计持久化。
 
 ### 1.5 公共响应结构
 
@@ -688,7 +689,6 @@ curl "http://192.168.84.134:8080/ruisui-bank-sim/api/health"
 curl -X POST "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers" \
   -H "Content-Type: application/json" \
   -H "requestId: REQ-FE-CREATE-001" \
-  -H "operatorNo: 77210021" \
   -H "branchNo: 772" \
   -H "workDate: 2026-07-09" \
   -d '{

@@ -70,6 +70,17 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void deploymentArtifactsConfigureAndDocumentTheServerOperator() throws Exception {
+        assertThat(Files.readString(root.resolve("conf/app.properties")))
+            .contains("webfe.poc.operatorNo=77210021");
+        assertThat(Files.readString(root.resolve("scripts/configure-tomcat.sh")))
+            .contains("POC_OPERATOR_NO", "-Dwebfe.poc.operatorNo=");
+        assertThat(Files.readString(root.resolve("docs/cnaps-frontend-api.md")))
+            .contains("POC_OPERATOR_NO", "webfe.poc.operatorNo")
+            .doesNotContain("| `operatorNo`", "-H \"operatorNo:");
+    }
+
+    @Test
     void operationsGuideDocumentsAutomationAndCredentialSafety() throws Exception {
         Path operationsGuide = root.resolve("docs/cnaps-operations.md");
 

@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class RequestSupport {
-    private static final String DEFAULT_OPERATOR_NO = "77210021";
     private static final String DEFAULT_BRANCH_NO = "772";
 
     private RequestSupport() {
@@ -19,10 +18,6 @@ public final class RequestSupport {
         }
         String fallback = request.getHeader("X-Request-Id");
         return fallback == null || fallback.isBlank() ? "REQ-" + System.currentTimeMillis() : fallback;
-    }
-
-    public static String operatorNo(HttpServletRequest request) {
-        return headerOrDefault(request, "operatorNo", DEFAULT_OPERATOR_NO);
     }
 
     public static String branchNo(HttpServletRequest request) {

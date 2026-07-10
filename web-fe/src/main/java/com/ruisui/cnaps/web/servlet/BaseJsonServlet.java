@@ -9,8 +9,10 @@ import com.ruisui.cnaps.web.tuxedo.TuxedoRequest;
 import com.ruisui.cnaps.web.tuxedo.TuxedoRequestMapper;
 import com.ruisui.cnaps.web.tuxedo.TuxedoResponse;
 import com.ruisui.cnaps.web.tuxedo.TuxedoResponseMapper;
+import com.ruisui.cnaps.web.tuxedo.TuxedoRuntimeConfig;
 
 import javax.servlet.ServletException;
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -21,12 +23,16 @@ abstract class BaseJsonServlet extends HttpServlet {
     protected TuxedoClient tuxedoClient;
     protected TuxedoRequestMapper requestMapper;
     private TuxedoResponseMapper responseMapper;
+    private String operatorNo;
 
     @Override
     public void init() throws ServletException {
-        this.tuxedoClient = TuxedoClientProvider.get(getServletContext());
+        ServletContext context = getServletContext();
+        TuxedoRuntimeConfig config = TuxedoClientProvider.config(context);
+        this.tuxedoClient = TuxedoClientProvider.get(context);
         this.requestMapper = new TuxedoRequestMapper();
         this.responseMapper = new TuxedoResponseMapper();
+        this.operatorNo = config.pocOperatorNo();
     }
 
     protected void callTuxedo(HttpServletRequest request, HttpServletResponse response, Map<String, Object> fields)
@@ -34,7 +40,7 @@ abstract class BaseJsonServlet extends HttpServlet {
         String requestId = RequestSupport.requestId(request);
         TuxedoRequest tuxedoRequest = requestMapper.from(
             requestId,
-            RequestSupport.operatorNo(request),
+            operatorNo,
             RequestSupport.branchNo(request),
             RequestSupport.workDate(request),
             fields

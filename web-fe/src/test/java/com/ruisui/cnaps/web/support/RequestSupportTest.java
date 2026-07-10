@@ -15,7 +15,6 @@ class RequestSupportTest {
         HttpServletRequest request = request(Map.of());
 
         assertThat(RequestSupport.requestId(request)).startsWith("REQ-");
-        assertThat(RequestSupport.operatorNo(request)).isEqualTo("77210021");
         assertThat(RequestSupport.branchNo(request)).isEqualTo("772");
         assertThat(RequestSupport.workDate(request)).isEqualTo(LocalDate.now().toString());
     }
@@ -24,13 +23,11 @@ class RequestSupportTest {
     void keepsExplicitHeadersWhenProvided() {
         HttpServletRequest request = request(Map.of(
             "X-Request-Id", "REQ-X-1",
-            "operatorNo", "90010001",
             "branchNo", "900",
             "workDate", "2026-07-08"
         ));
 
         assertThat(RequestSupport.requestId(request)).isEqualTo("REQ-X-1");
-        assertThat(RequestSupport.operatorNo(request)).isEqualTo("90010001");
         assertThat(RequestSupport.branchNo(request)).isEqualTo("900");
         assertThat(RequestSupport.workDate(request)).isEqualTo("2026-07-08");
     }

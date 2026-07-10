@@ -30,8 +30,11 @@ class TuxedoRequestMapperTest {
             "REQ-1",
             "77210021",
             "772",
-            "2026-07-08",
-            Map.of("amount", "1.00", "payeeAccountNo", "622200000000000001")
+            Map.of(
+                "amount", "1.00",
+                "payeeAccountNo", "622200000000000001",
+                "workDate", "2026-07-08"
+            )
         );
 
         assertThat(request.fields())
@@ -45,17 +48,27 @@ class TuxedoRequestMapperTest {
     }
 
     @Test
-    void keepsTrustedOperatorWhenBodyOrQueryContainsOperator() {
+    void keepsTrustedCommonFieldsWhilePreservingEndpointWorkDate() {
         TuxedoRequest request = mapper.from(
-            "REQ",
+            "SERVER-REQ",
             "SERVER-OP",
-            "772",
-            "2026-07-10",
-            Map.of("operatorNo", "CLIENT-OP")
+            "SERVER-BRANCH",
+            Map.of(
+                "requestId", "CLIENT-REQ",
+                "operatorNo", "CLIENT-OP",
+                "branchNo", "CLIENT-BRANCH",
+                "workDate", "2026-07-10"
+            )
         );
 
         assertThat(request.fields())
+            .containsEntry("REQUEST_ID", "SERVER-REQ")
+            .containsEntry("REQ_ID", "SERVER-REQ")
             .containsEntry("OPERATOR_NO", "SERVER-OP")
-            .doesNotContainValue("CLIENT-OP");
+            .containsEntry("BRANCH_NO", "SERVER-BRANCH")
+            .containsEntry("WORK_DATE", "2026-07-10")
+            .doesNotContainValue("CLIENT-REQ")
+            .doesNotContainValue("CLIENT-OP")
+            .doesNotContainValue("CLIENT-BRANCH");
     }
 }

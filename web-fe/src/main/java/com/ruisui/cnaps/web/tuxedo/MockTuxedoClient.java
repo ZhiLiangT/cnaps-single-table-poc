@@ -1,6 +1,5 @@
 package com.ruisui.cnaps.web.tuxedo;
 
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -33,12 +32,15 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private TuxedoResponse create(TuxedoRequest request) {
+        String workDate = text(request, "WORK_DATE");
+        if (workDate == null || workDate.isBlank()) {
+            return TuxedoResponse.fail("2001", "必输字段为空：workDate");
+        }
         String validationError = required(request, "PAYEE_ACCT");
         if (validationError != null) {
             return TuxedoResponse.fail("2001", validationError);
         }
         String serialNo = String.format("%07d", serial.incrementAndGet());
-        String workDate = text(request, "WORK_DATE", LocalDate.now().toString());
         String branchNo = text(request, "BRANCH_NO", "772");
         String billId = "B" + workDate.replace("-", "") + branchNo + serialNo;
 
@@ -70,7 +72,10 @@ public class MockTuxedoClient implements TuxedoClient {
             return TuxedoResponse.fail("3003", "当前状态不允许操作：" + voucher.get("STATUS"));
         }
         request.fields().forEach((key, value) -> {
-            if (!key.endsWith("_ID") && !"REQ_ID".equals(key) && !"REQUEST_ID".equals(key)) {
+            if (!key.endsWith("_ID")
+                && !"REQ_ID".equals(key)
+                && !"REQUEST_ID".equals(key)
+                && !"SERIAL_NO".equals(key)) {
                 voucher.put(key, value);
             }
         });

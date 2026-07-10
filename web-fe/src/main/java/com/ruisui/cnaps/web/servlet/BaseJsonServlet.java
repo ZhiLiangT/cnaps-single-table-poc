@@ -44,7 +44,6 @@ abstract class BaseJsonServlet extends HttpServlet {
             requestId,
             operatorNo,
             branchNo,
-            null,
             fields
         );
         TuxedoResponse tuxedoResponse = tuxedoClient.call(

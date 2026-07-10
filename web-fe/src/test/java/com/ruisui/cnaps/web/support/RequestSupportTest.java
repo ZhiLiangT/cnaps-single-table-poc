@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Proxy;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -40,6 +41,33 @@ class RequestSupportTest {
         RequestSupport.includeBillPath(fields, "/BILL-1/details");
 
         assertThat(fields).containsExactly(Map.entry("billId", "BILL-1"));
+    }
+
+    @Test
+    void includesCurrentWorkDateWhenMissing() {
+        Map<String, Object> fields = new LinkedHashMap<>();
+
+        RequestSupport.includeDefaultWorkDate(fields);
+
+        assertThat(fields).containsEntry("workDate", LocalDate.now().toString());
+    }
+
+    @Test
+    void includesCurrentWorkDateWhenBlank() {
+        Map<String, Object> fields = new LinkedHashMap<>(Map.of("workDate", "  "));
+
+        RequestSupport.includeDefaultWorkDate(fields);
+
+        assertThat(fields).containsEntry("workDate", LocalDate.now().toString());
+    }
+
+    @Test
+    void preservesExplicitWorkDate() {
+        Map<String, Object> fields = new LinkedHashMap<>(Map.of("workDate", "2026-07-08"));
+
+        RequestSupport.includeDefaultWorkDate(fields);
+
+        assertThat(fields).containsEntry("workDate", "2026-07-08");
     }
 
     private HttpServletRequest request(String uri, String contextPath, Map<String, String[]> parameters) {

@@ -15,6 +15,10 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, Object> fields = new LinkedHashMap<>(RequestSupport.queryParams(request));
+        String apiPath = RequestSupport.apiPath(request);
+        if ("/api/cnaps/vouchers".equals(apiPath) || "/api/cnaps/vouchers/review-list".equals(apiPath)) {
+            RequestSupport.includeDefaultWorkDate(fields);
+        }
         RequestSupport.includeBillPath(fields, request.getPathInfo());
         callTuxedo(request, response, fields);
     }

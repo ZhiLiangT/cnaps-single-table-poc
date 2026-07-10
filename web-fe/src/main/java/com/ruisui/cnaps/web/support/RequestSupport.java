@@ -1,6 +1,7 @@
 package com.ruisui.cnaps.web.support;
 
 import javax.servlet.http.HttpServletRequest;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -35,6 +36,13 @@ public final class RequestSupport {
         String[] segments = pathInfo.substring(1).split("/");
         if (segments.length > 0 && !segments[0].isBlank()) {
             fields.put("billId", segments[0]);
+        }
+    }
+
+    public static void includeDefaultWorkDate(Map<String, Object> fields) {
+        Object workDate = fields.get("workDate");
+        if (workDate == null || String.valueOf(workDate).isBlank()) {
+            fields.put("workDate", LocalDate.now().toString());
         }
     }
 }

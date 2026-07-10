@@ -83,7 +83,6 @@ public class TuxedoRequestMapper {
         String requestId,
         String operatorNo,
         String branchNo,
-        String workDate,
         Map<String, ?> body
     ) {
         Map<String, Object> fields = new LinkedHashMap<>();
@@ -98,7 +97,6 @@ public class TuxedoRequestMapper {
         putIfPresent(fields, "REQ_ID", requestId);
         putIfPresent(fields, "OPERATOR_NO", operatorNo);
         putIfPresent(fields, "BRANCH_NO", branchNo);
-        putIfPresent(fields, "WORK_DATE", workDate);
         return new TuxedoRequest(fields);
     }
 

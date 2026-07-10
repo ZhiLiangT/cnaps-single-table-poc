@@ -18,7 +18,6 @@ class V03TuxedoContractTest {
             "REQ-V03-FE-001",
             "77210021",
             "772",
-            "2026-07-07",
             Map.of(
                 "pageNo", "1",
                 "pageSize", "10",

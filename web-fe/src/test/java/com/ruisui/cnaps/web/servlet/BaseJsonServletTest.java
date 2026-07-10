@@ -16,6 +16,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -62,6 +63,65 @@ class BaseJsonServletTest {
         assertThat(captured.get().fields().get("REQ_ID").toString()).startsWith("REQ-");
     }
 
+    @Test
+    void defaultsWorkDateForVoucherCollection() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        servlet.doGet(
+            request("/api/cnaps/vouchers", null, Map.of()),
+            response(new ByteArrayOutputStream())
+        );
+
+        assertThat(captured.get().fields()).containsEntry("WORK_DATE", LocalDate.now().toString());
+    }
+
+    @Test
+    void preservesExplicitWorkDateForVoucherCollection() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        servlet.doGet(
+            request(
+                "/api/cnaps/vouchers/review-list",
+                "/review-list",
+                Map.of("workDate", new String[] {"2026-07-08"})
+            ),
+            response(new ByteArrayOutputStream())
+        );
+
+        assertThat(captured.get().fields()).containsEntry("WORK_DATE", "2026-07-08");
+    }
+
+    @Test
+    void doesNotDefaultWorkDateForVoucherDetail() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        servlet.doGet(
+            request("/api/cnaps/vouchers/BILL-1", "/BILL-1", Map.of()),
+            response(new ByteArrayOutputStream())
+        );
+
+        assertThat(captured.get().fields()).doesNotContainKey("WORK_DATE");
+    }
+
+    private CnapsVoucherServlet voucherServlet(AtomicReference<TuxedoRequest> captured) throws Exception {
+        TuxedoClient client = (serviceName, request) -> {
+            captured.set(request);
+            return TuxedoResponse.ok("ok", Map.of());
+        };
+        ServletContext context = servletContext(Map.of(
+            "poc.operatorNo", "SERVER-OP",
+            "poc.branchNo", "SERVER-BRANCH",
+            "webfe.config", tempDir.resolve("missing-app.properties").toString()
+        ));
+        context.setAttribute(TuxedoClient.class.getName(), client);
+        CnapsVoucherServlet servlet = new CnapsVoucherServlet();
+        servlet.init(servletConfig(context));
+        return servlet;
+    }
+
     private ServletContext servletContext(Map<String, String> initParameters) {
         Map<String, Object> attributes = new HashMap<>();
         return proxy(ServletContext.class, (method, args) -> switch (method.getName()) {
@@ -89,6 +149,17 @@ class BaseJsonServletTest {
             case "getMethod" -> "GET";
             case "getRequestURI" -> "/api/health";
             case "getContextPath" -> "";
+            default -> defaultValue(method.getReturnType());
+        });
+    }
+
+    private HttpServletRequest request(String uri, String pathInfo, Map<String, String[]> parameters) {
+        return proxy(HttpServletRequest.class, (method, args) -> switch (method.getName()) {
+            case "getMethod" -> "GET";
+            case "getRequestURI" -> uri;
+            case "getContextPath" -> "";
+            case "getPathInfo" -> pathInfo;
+            case "getParameterMap" -> parameters;
             default -> defaultValue(method.getReturnType());
         });
     }

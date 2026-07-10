@@ -50,6 +50,19 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void updateServiceMetadataAcceptsWorkDate() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+        int updateStart = metadata.indexOf("service=CNAPS5701U");
+        int updateEnd = metadata.indexOf("service=", updateStart + 1);
+        String updateMetadata = metadata.substring(updateStart, updateEnd);
+
+        assertThat(updateMetadata)
+            .contains("param=WORK_DATE")
+            .contains("type=string")
+            .contains("access=inout");
+    }
+
+    @Test
     void operationalScriptsCoverPreflightAndJoltMetadataLoad() {
         assertThat(root.resolve("scripts/preflight.sh")).exists();
         assertThat(root.resolve("scripts/load-jolt-metadata.sh")).exists();

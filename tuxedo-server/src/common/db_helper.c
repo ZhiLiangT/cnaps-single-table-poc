@@ -259,6 +259,7 @@ int db_update_voucher(const cnaps_voucher_row *row)
 {
     static const char *sql =
         "UPDATE T_CNAPS_BILL_POC SET "
+        "WORK_DATE=COALESCE(TO_DATE(:work_date, 'YYYY-MM-DD'), WORK_DATE), "
         "PAYEE_ACCOUNT_NO=COALESCE(:payee_account_no, PAYEE_ACCOUNT_NO), "
         "PAYEE_NAME=COALESCE(:payee_name, PAYEE_NAME), "
         "AMOUNT=COALESCE(TO_NUMBER(:amount), AMOUNT), "

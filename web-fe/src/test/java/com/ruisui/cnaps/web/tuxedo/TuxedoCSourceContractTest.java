@@ -52,4 +52,19 @@ class TuxedoCSourceContractTest {
             .contains("SYSHEALTH")
             .contains("cnaps_return_response");
     }
+
+    @Test
+    void nativeCreateRequiresWorkDateAndUpdatePersistsIt() throws Exception {
+        String createSource = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
+        String updateSource = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
+        String dbHelper = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+
+        assertThat(createSource)
+            .contains("row.work_date[0] == '\\0'")
+            .doesNotContain("row->work_date, sizeof(row->work_date), \"2026-07-09\"");
+        assertThat(updateSource)
+            .contains("CNAPS_F_WORK_DATE, row.work_date");
+        assertThat(dbHelper)
+            .contains("WORK_DATE=COALESCE(TO_DATE(:work_date, 'YYYY-MM-DD'), WORK_DATE)");
+    }
 }

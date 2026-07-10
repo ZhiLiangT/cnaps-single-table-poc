@@ -30,7 +30,7 @@ static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row)
     char date_part[9] = {0};
 
     memset(row, 0, sizeof(*row));
-    copy_text(fbfr, CNAPS_F_WORK_DATE, row->work_date, sizeof(row->work_date), "2026-07-09");
+    copy_text(fbfr, CNAPS_F_WORK_DATE, row->work_date, sizeof(row->work_date), "");
     copy_text(fbfr, CNAPS_F_BRANCH_NO, row->branch_no, sizeof(row->branch_no), "772");
     copy_text(fbfr, CNAPS_F_OPERATOR_NO, row->operator_no, sizeof(row->operator_no), "");
     copy_text(fbfr, CNAPS_F_BUSINESS_TYPE, row->business_type, sizeof(row->business_type), "02102");
@@ -72,7 +72,7 @@ void CNAPS5701E(TPSVCINFO *rqst)
 
     cnaps_log_service_start("CNAPS5701E");
     row_from_create_request(fbfr, &row);
-    if (row.payee_account_no[0] == '\0' || row.payee_name[0] == '\0' || row.amount[0] == '\0') {
+    if (row.work_date[0] == '\0' || row.payee_account_no[0] == '\0' || row.payee_name[0] == '\0' || row.amount[0] == '\0') {
         cnaps_return_error(rqst, "2001", "required field missing");
         return;
     }

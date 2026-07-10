@@ -19,6 +19,7 @@ void CNAPS5701U(TPSVCINFO *rqst)
 
     cnaps_log_service_start("CNAPS5701U");
     get_field(fbfr, CNAPS_F_BILL_ID, row.bill_id, sizeof(row.bill_id));
+    get_field(fbfr, CNAPS_F_WORK_DATE, row.work_date, sizeof(row.work_date));
     get_field(fbfr, CNAPS_F_PAYEE_ACCT, row.payee_account_no, sizeof(row.payee_account_no));
     get_field(fbfr, CNAPS_F_PAYEE_NAME, row.payee_name, sizeof(row.payee_name));
     get_field(fbfr, CNAPS_F_AMOUNT, row.amount, sizeof(row.amount));

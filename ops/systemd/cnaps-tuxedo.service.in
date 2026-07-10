@@ -1,0 +1,19 @@
+[Unit]
+Description=CNAPS POC Tuxedo and Jolt domain
+Requires=oracle-xe-21c.service
+After=network-online.target oracle-xe-21c.service
+Before=tomcat.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=@RUN_USER@
+Environment=APP_HOME=@APP_HOME@
+WorkingDirectory=@APP_HOME@
+ExecStart=@APP_HOME@/scripts/cnapsctl.sh tuxedo-up
+ExecStop=@APP_HOME@/scripts/cnapsctl.sh tuxedo-down
+TimeoutStartSec=120
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

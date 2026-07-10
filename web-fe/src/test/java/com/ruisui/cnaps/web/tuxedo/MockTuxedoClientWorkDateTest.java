@@ -117,8 +117,14 @@ class MockTuxedoClientWorkDateTest {
         requestFields.put("REQ_ID", "SERVER-REQ");
         requestFields.put("OPERATOR_NO", "SERVER-OP");
         requestFields.put("BRANCH_NO", "SERVER-BRANCH");
+        requestFields.put("BUSINESS_TYPE", "02102");
+        requestFields.put("ACCOUNT_PART1", "404045");
+        requestFields.put("ACCOUNT_PART2", "00772");
+        requestFields.put("ACCOUNT_PART3", "000000000001");
         requestFields.put("PAYEE_ACCT", "622200000000000001");
         requestFields.put("PAYEE_NAME", "测试收款人");
+        requestFields.put("PRIORITY", "NORM");
+        requestFields.put("SYSTEM_TYPE", "CNAPS");
         requestFields.put("AMOUNT", "100.00");
         requestFields.putAll(fields);
         return new TuxedoRequest(requestFields);

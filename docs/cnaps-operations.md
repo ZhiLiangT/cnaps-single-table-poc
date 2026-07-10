@@ -80,6 +80,8 @@ chmod 600 conf/db.env
 oracle-xe-21c.service -> cnaps-tuxedo.service -> tomcat.service
 ```
 
+项目位于用户主目录且虚拟机启用了 SELinux Enforcing。`cnaps-tuxedo.service` 仅对自身显式使用 `unconfined_t` 上下文，以便读取和执行该项目目录中的 Tuxedo 脚本；该设置不会关闭全局 SELinux。
+
 检查启用状态：
 
 ```bash

@@ -2,11 +2,33 @@ package com.ruisui.cnaps.web.tuxedo;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JoltTuxedoClientTest {
+    @Test
+    void extractsWorkDateFromJoltResponse() throws Exception {
+        JoltTuxedoClient client = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"));
+        FakeRemoteService remoteService = new FakeRemoteService();
+        Method readResponseFields = JoltTuxedoClient.class.getDeclaredMethod(
+            "readResponseFields",
+            Class.class,
+            Object.class
+        );
+        readResponseFields.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> fields = (Map<String, Object>) readResponseFields.invoke(
+            client,
+            FakeRemoteService.class,
+            remoteService
+        );
+
+        assertThat(fields).containsEntry("WORK_DATE", "2026-07-11");
+    }
+
     @Test
     void returnsUnavailableWhenJoltRuntimeClassesAreMissing() {
         TuxedoRuntimeConfig config = TuxedoRuntimeConfig.defaults("jolt");
@@ -30,6 +52,12 @@ class JoltTuxedoClientTest {
                 throw new ClassNotFoundException(name);
             }
             return JoltTuxedoClientTest.class.getClassLoader().loadClass(name);
+        }
+    }
+
+    public static final class FakeRemoteService {
+        public String getStringDef(String fieldName, String defaultValue) {
+            return "WORK_DATE".equals(fieldName) ? "2026-07-11" : defaultValue;
         }
     }
 }

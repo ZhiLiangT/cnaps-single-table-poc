@@ -165,8 +165,12 @@ public class MockTuxedoClient implements TuxedoClient {
 
     private Map<String, Object> voucherPage(TuxedoRequest request, String forcedStatus) {
         String status = forcedStatus == null ? text(request, "STATUS") : forcedStatus;
+        String workDate = text(request, "WORK_DATE");
+        String branchNo = text(request, "BRANCH_NO");
         List<Map<String, Object>> records = vouchers.values().stream()
             .filter(voucher -> status == null || status.isBlank() || status.equals(voucher.get("STATUS")))
+            .filter(voucher -> workDate == null || workDate.isBlank() || workDate.equals(voucher.get("WORK_DATE")))
+            .filter(voucher -> branchNo == null || branchNo.isBlank() || branchNo.equals(voucher.get("BRANCH_NO")))
             .filter(voucher -> Boolean.parseBoolean(text(request, "INCLUDE_DELETED", "false")) || !"40_DELETED".equals(voucher.get("STATUS")))
             .filter(voucher -> contains(voucher, "PAYEE_NAME", text(request, "PAYEE_NAME")))
             .map(voucher -> (Map<String, Object>) new LinkedHashMap<>(voucher))

@@ -54,12 +54,9 @@ class DeploymentArtifactTest {
         String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
         int updateStart = metadata.indexOf("service=CNAPS5701U");
         int updateEnd = metadata.indexOf("service=", updateStart + 1);
-        String updateMetadata = metadata.substring(updateStart, updateEnd);
+        String updateMetadata = normalizeLineEndings(metadata.substring(updateStart, updateEnd));
 
-        assertThat(updateMetadata)
-            .contains("param=WORK_DATE")
-            .contains("type=string")
-            .contains("access=inout");
+        assertThat(updateMetadata).contains("param=WORK_DATE\ntype=string\naccess=inout");
     }
 
     @Test
@@ -91,7 +88,8 @@ class DeploymentArtifactTest {
         assertThat(Files.readString(root.resolve("scripts/configure-tomcat.sh")))
             .contains(
                 "POC_OPERATOR_NO",
-                "POC_BRANCH_NO",
+                "POC_BRANCH_NO=${POC_BRANCH_NO:-772}",
+                "echo \"POC_BRANCH_NO=\\\"$POC_BRANCH_NO\\\"\"",
                 "-Dwebfe.poc.operatorNo=",
                 "-Dwebfe.poc.branchNo=");
     }
@@ -105,7 +103,9 @@ class DeploymentArtifactTest {
                 "webfe.poc.operatorNo",
                 "workDate",
                 "创建时必填",
-                "修改时可选")
+                "修改时可选",
+                "工作日期过滤；未传时默认当前日期。",
+                "修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。")
             .doesNotContain(
                 "### 1.4 公共请求头",
                 "| `operatorNo`",
@@ -129,5 +129,9 @@ class DeploymentArtifactTest {
             "不要提交、复制或输出 conf/db.env",
             "192.168.84.134",
             "/home/tian/cnaps-single-table-poc");
+    }
+
+    private String normalizeLineEndings(String value) {
+        return value.replace("\r\n", "\n");
     }
 }

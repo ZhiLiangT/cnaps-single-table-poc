@@ -3,6 +3,7 @@ package com.ruisui.cnaps.web.tuxedo;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,6 +65,51 @@ class MockTuxedoClientWorkDateTest {
         );
 
         assertThat(updated.fields()).containsEntry("WORK_DATE", "2026-07-10");
+    }
+
+    @Test
+    void voucherListFiltersByWorkDateAndTrustedBranch() {
+        TuxedoResponse matching = createVoucher("2026-07-10", "SERVER-BRANCH");
+        createVoucher("2026-07-11", "SERVER-BRANCH");
+        createVoucher("2026-07-10", "OTHER-BRANCH");
+
+        List<Map<String, Object>> records = records(client.call(
+            "CNAPS4609Q",
+            request(Map.of("WORK_DATE", "2026-07-10", "BRANCH_NO", "SERVER-BRANCH"))
+        ));
+
+        assertThat(records)
+            .extracting(record -> record.get("BILL_ID"))
+            .containsExactly(matching.fields().get("BILL_ID"));
+    }
+
+    @Test
+    void reviewListFiltersByWorkDateAndTrustedBranch() {
+        TuxedoResponse matching = createVoucher("2026-07-10", "SERVER-BRANCH");
+        createVoucher("2026-07-11", "SERVER-BRANCH");
+        createVoucher("2026-07-10", "OTHER-BRANCH");
+
+        List<Map<String, Object>> records = records(client.call(
+            "CNAPS5702Q",
+            request(Map.of("WORK_DATE", "2026-07-10", "BRANCH_NO", "SERVER-BRANCH"))
+        ));
+
+        assertThat(records)
+            .extracting(record -> record.get("BILL_ID"))
+            .containsExactly(matching.fields().get("BILL_ID"));
+    }
+
+    private TuxedoResponse createVoucher(String workDate, String branchNo) {
+        return client.call(
+            "CNAPS5701E",
+            request(Map.of("WORK_DATE", workDate, "BRANCH_NO", branchNo))
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> records(TuxedoResponse response) {
+        Map<String, Object> page = (Map<String, Object>) response.fields().get("_DATA");
+        return (List<Map<String, Object>>) page.get("RECORDS");
     }
 
     private TuxedoRequest request(Map<String, ?> fields) {

@@ -10,6 +10,7 @@ import java.util.function.Function;
 
 public record TuxedoRuntimeConfig(
     String mode,
+    String pocOperatorNo,
     String appHome,
     String joltListen,
     int joltTimeoutMillis,
@@ -18,6 +19,7 @@ public record TuxedoRuntimeConfig(
     String joltUserPassword,
     String joltAppPassword
 ) {
+    private static final String DEFAULT_POC_OPERATOR_NO = "77210021";
     private static final String DEFAULT_APP_HOME = "/opt/ruisui-bank-sim";
     private static final String DEFAULT_JOLT_LISTEN = "//127.0.0.1:8000";
     private static final int DEFAULT_JOLT_TIMEOUT_MILLIS = 30000;
@@ -30,6 +32,7 @@ public record TuxedoRuntimeConfig(
     static TuxedoRuntimeConfig defaults(String mode) {
         return new TuxedoRuntimeConfig(
             valueOrDefault(mode, "mock"),
+            DEFAULT_POC_OPERATOR_NO,
             DEFAULT_APP_HOME,
             DEFAULT_JOLT_LISTEN,
             DEFAULT_JOLT_TIMEOUT_MILLIS,
@@ -51,6 +54,16 @@ public record TuxedoRuntimeConfig(
             "WEBFE_TUXEDO_CLIENT_MODE",
             "tuxedo.client.mode",
             "mock",
+            appProperties,
+            systemProperty,
+            environment,
+            contextParameter
+        );
+        String pocOperatorNo = resolveValue(
+            "webfe.poc.operatorNo",
+            "POC_OPERATOR_NO",
+            "poc.operatorNo",
+            DEFAULT_POC_OPERATOR_NO,
             appProperties,
             systemProperty,
             environment,
@@ -89,6 +102,7 @@ public record TuxedoRuntimeConfig(
 
         return new TuxedoRuntimeConfig(
             mode,
+            pocOperatorNo,
             appHome,
             joltListen,
             parsePositiveInt(timeout, DEFAULT_JOLT_TIMEOUT_MILLIS),

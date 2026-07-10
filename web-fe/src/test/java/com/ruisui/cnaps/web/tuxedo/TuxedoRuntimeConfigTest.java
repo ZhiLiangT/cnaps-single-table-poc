@@ -10,6 +10,39 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TuxedoRuntimeConfigTest {
     @Test
+    void resolvesPocOperatorNumberFromRuntimeSourcesAndDefault() {
+        Properties appProperties = new Properties();
+        appProperties.setProperty("webfe.poc.operatorNo", "APP-OP");
+
+        TuxedoRuntimeConfig fromSystem = TuxedoRuntimeConfig.resolve(
+            appProperties,
+            key -> "webfe.poc.operatorNo".equals(key) ? "SYS-OP" : null,
+            env(Map.of("POC_OPERATOR_NO", "ENV-OP")),
+            key -> "poc.operatorNo".equals(key) ? "CTX-OP" : null
+        );
+        assertThat(fromSystem.pocOperatorNo()).isEqualTo("SYS-OP");
+
+        TuxedoRuntimeConfig fromEnvironment = TuxedoRuntimeConfig.resolve(
+            appProperties, key -> null, env(Map.of("POC_OPERATOR_NO", "ENV-OP")),
+            key -> "poc.operatorNo".equals(key) ? "CTX-OP" : null);
+        assertThat(fromEnvironment.pocOperatorNo()).isEqualTo("ENV-OP");
+
+        TuxedoRuntimeConfig fromProperties = TuxedoRuntimeConfig.resolve(
+            appProperties, key -> null, env(Map.of()),
+            key -> "poc.operatorNo".equals(key) ? "CTX-OP" : null);
+        assertThat(fromProperties.pocOperatorNo()).isEqualTo("APP-OP");
+
+        TuxedoRuntimeConfig fromContext = TuxedoRuntimeConfig.resolve(
+            new Properties(), key -> null, env(Map.of()),
+            key -> "poc.operatorNo".equals(key) ? "CTX-OP" : null);
+        assertThat(fromContext.pocOperatorNo()).isEqualTo("CTX-OP");
+
+        TuxedoRuntimeConfig defaults = TuxedoRuntimeConfig.resolve(
+            new Properties(), key -> null, env(Map.of()), key -> null);
+        assertThat(defaults.pocOperatorNo()).isEqualTo("77210021");
+    }
+
+    @Test
     void resolvesModeFromSystemThenEnvThenAppPropertiesThenContextThenMock() {
         Properties appProperties = new Properties();
         appProperties.setProperty("webfe.tuxedo.client.mode", "jolt");

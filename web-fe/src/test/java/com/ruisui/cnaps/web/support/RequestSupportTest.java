@@ -46,19 +46,21 @@ class RequestSupportTest {
     @Test
     void includesCurrentWorkDateWhenMissing() {
         Map<String, Object> fields = new LinkedHashMap<>();
+        String dateBefore = LocalDate.now().toString();
 
         RequestSupport.includeDefaultWorkDate(fields);
 
-        assertThat(fields).containsEntry("workDate", LocalDate.now().toString());
+        assertThat(fields.get("workDate")).isIn(dateBefore, LocalDate.now().toString());
     }
 
     @Test
     void includesCurrentWorkDateWhenBlank() {
         Map<String, Object> fields = new LinkedHashMap<>(Map.of("workDate", "  "));
+        String dateBefore = LocalDate.now().toString();
 
         RequestSupport.includeDefaultWorkDate(fields);
 
-        assertThat(fields).containsEntry("workDate", LocalDate.now().toString());
+        assertThat(fields.get("workDate")).isIn(dateBefore, LocalDate.now().toString());
     }
 
     @Test

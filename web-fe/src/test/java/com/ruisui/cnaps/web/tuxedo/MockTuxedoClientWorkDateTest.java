@@ -51,6 +51,21 @@ class MockTuxedoClientWorkDateTest {
             .containsEntry("SERIAL_NO", originalSerialNo);
     }
 
+    @Test
+    void preservesWorkDateWhenUpdateOmitsIt() {
+        TuxedoResponse created = client.call(
+            "CNAPS5701E",
+            request(Map.of("WORK_DATE", "2026-07-10"))
+        );
+
+        TuxedoResponse updated = client.call(
+            "CNAPS5701U",
+            request(Map.of("BILL_ID", created.fields().get("BILL_ID")))
+        );
+
+        assertThat(updated.fields()).containsEntry("WORK_DATE", "2026-07-10");
+    }
+
     private TuxedoRequest request(Map<String, ?> fields) {
         Map<String, Object> requestFields = new LinkedHashMap<>();
         requestFields.put("REQ_ID", "SERVER-REQ");

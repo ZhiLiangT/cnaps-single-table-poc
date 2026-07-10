@@ -67,13 +67,14 @@ class BaseJsonServletTest {
     void defaultsWorkDateForVoucherCollection() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
+        String dateBefore = LocalDate.now().toString();
 
         servlet.doGet(
             request("/api/cnaps/vouchers", null, Map.of()),
             response(new ByteArrayOutputStream())
         );
 
-        assertThat(captured.get().fields()).containsEntry("WORK_DATE", LocalDate.now().toString());
+        assertThat(captured.get().fields().get("WORK_DATE")).isIn(dateBefore, LocalDate.now().toString());
     }
 
     @Test

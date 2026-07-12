@@ -305,6 +305,20 @@ class TuxedoCSourceContractTest {
         );
     }
 
+    @Test
+    void nativeVoucherQueryKeepsFilterAndFetchStatusesDistinct() throws Exception {
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+
+        assertThat(db).contains(
+            "const char *status_filter",
+            "sword fetch_status;",
+            "bind_text(stmt, \":status\", status_filter)",
+            "fetch_status = OCIStmtFetch2",
+            "fetch_status == OCI_NO_DATA",
+            "oci_check(fetch_status, \"OCIStmtFetch2(query)\")"
+        );
+    }
+
     private int countOccurrences(String value, String token) {
         return (value.length() - value.replace(token, "").length()) / token.length();
     }

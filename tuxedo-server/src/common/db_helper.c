@@ -464,7 +464,7 @@ define_error:
 int db_query_vouchers(
     const char *work_date,
     const char *branch_no,
-    const char *status,
+    const char *status_filter,
     const char *serial_no,
     const char *voucher_no,
     const char *payee_name,
@@ -487,7 +487,7 @@ int db_query_vouchers(
     OCIStmt *stmt = NULL;
     cnaps_voucher_row fetched = {0};
     sb2 indicators[40] = {0};
-    sword status;
+    sword fetch_status;
     long total_value = 0;
     long include_deleted_value = include_deleted ? 1 : 0;
     long offset_rows;
@@ -506,7 +506,7 @@ int db_query_vouchers(
     if (prepare_stmt(count_sql, &stmt) != 0) return -1;
     if (bind_text(stmt, ":work_date", work_date) != 0
         || bind_text(stmt, ":branch_no", branch_no) != 0
-        || bind_text(stmt, ":status", status) != 0
+        || bind_text(stmt, ":status", status_filter) != 0
         || bind_text(stmt, ":serial_no", serial_no) != 0
         || bind_text(stmt, ":voucher_no", voucher_no) != 0
         || bind_text(stmt, ":payee_name", payee_name) != 0
@@ -528,7 +528,7 @@ int db_query_vouchers(
     if (prepare_stmt(page_sql, &stmt) != 0) return -1;
     if (bind_text(stmt, ":work_date", work_date) != 0
         || bind_text(stmt, ":branch_no", branch_no) != 0
-        || bind_text(stmt, ":status", status) != 0
+        || bind_text(stmt, ":status", status_filter) != 0
         || bind_text(stmt, ":serial_no", serial_no) != 0
         || bind_text(stmt, ":voucher_no", voucher_no) != 0
         || bind_text(stmt, ":payee_name", payee_name) != 0
@@ -542,9 +542,9 @@ int db_query_vouchers(
         return -1;
     }
     while (row_count < page_size) {
-        status = OCIStmtFetch2(stmt, g_err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT);
-        if (status == OCI_NO_DATA) break;
-        if (oci_check(status, "OCIStmtFetch2(query)") != 0) {
+        fetch_status = OCIStmtFetch2(stmt, g_err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT);
+        if (fetch_status == OCI_NO_DATA) break;
+        if (oci_check(fetch_status, "OCIStmtFetch2(query)") != 0) {
             free_stmt(stmt);
             return -1;
         }

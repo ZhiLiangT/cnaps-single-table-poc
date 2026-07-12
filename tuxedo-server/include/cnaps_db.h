@@ -53,7 +53,21 @@ int db_rollback(void);
 int db_insert_voucher(const cnaps_voucher_row *row);
 int db_update_voucher(const cnaps_voucher_row *row);
 int db_find_voucher(const char *bill_id, cnaps_voucher_row *row);
-int db_query_vouchers(const char *work_date, const char *branch_no, const char *status);
+int db_query_vouchers(
+    const char *work_date,
+    const char *branch_no,
+    const char *status,
+    const char *serial_no,
+    const char *voucher_no,
+    const char *payee_name,
+    const char *payee_account_no,
+    int include_deleted,
+    int page_no,
+    int page_size,
+    cnaps_voucher_row *rows,
+    int row_capacity,
+    int *total
+);
 int db_next_serial_no(const char *work_date, const char *branch_no, char *serial_no, int serial_no_size);
 
 #endif

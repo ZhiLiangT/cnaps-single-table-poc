@@ -56,6 +56,8 @@ DELETE_TIME     12036   string
 LAST_ACTION_TIME 12037  string
 CREATED_AT      12038   string
 UPDATED_AT      12039   string
+CITY            12040   string
+KEYWORD         12041   string
 PAGE_NO         13001   long
 PAGE_SIZE       13002   long
 TOTAL_ELEMENTS  13003   long

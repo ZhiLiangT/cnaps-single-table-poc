@@ -130,4 +130,75 @@ class TuxedoCSourceContractTest {
             )
             .doesNotContain("FM999999999999990D00");
     }
+
+    @Test
+    void nativeVoucherQueriesCountThenFetchFullyDefinedOrderedPages() throws Exception {
+        String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_db.h"));
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+
+        assertThat(header).contains(
+            "const char *serial_no", "const char *voucher_no", "const char *payee_name",
+            "const char *payee_account_no", "int include_deleted", "int page_no",
+            "int page_size", "cnaps_voucher_row *rows", "int row_capacity", "int *total"
+        );
+        assertThat(db).contains(
+            "SELECT COUNT(1) FROM T_CNAPS_BILL_POC",
+            "(:serial_no IS NULL OR SERIAL_NO=:serial_no)",
+            "(:voucher_no IS NULL OR VOUCHER_NO=:voucher_no)",
+            "PAYEE_NAME LIKE '%' || :payee_name || '%'",
+            "(:payee_account_no IS NULL OR PAYEE_ACCOUNT_NO=:payee_account_no)",
+            "(:include_deleted=1 OR STATUS<>'40_DELETED')",
+            "ORDER BY BILL_ID",
+            "OFFSET :offset_rows ROWS FETCH NEXT :page_size ROWS ONLY",
+            "define_voucher_row", "OCIStmtFetch2"
+        );
+        assertThat(db.indexOf("OCIStmtExecute(count)")).isLessThan(db.indexOf("OCIStmtExecute(query)"));
+    }
+
+    @Test
+    void nativeVoucherQueryDoesNotRestoreANegativeRowCapacityAfterDisablingThePage() throws Exception {
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+
+        assertThat(db).contains(
+            "if (rows == NULL || row_capacity <= 0) page_size = 0;",
+            "if (row_capacity > 0 && page_size > row_capacity) page_size = row_capacity;"
+        );
+    }
+
+    @Test
+    void nativeQueryServicesUseSafeBoundsAndAlignedRepeatedOccurrences() throws Exception {
+        String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_service.h"));
+        String fml = Files.readString(root.resolve("tuxedo-server/src/common/fml_helper.c"));
+        String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
+
+        assertThat(header).contains("cnaps_put_string_occurrence", "cnaps_put_voucher_occurrence");
+        assertThat(fml).contains(
+            "Fchg32(fbfr, field_id, occurrence", "cnaps_put_voucher_occurrence",
+            "CNAPS_F_BILL_ID", "CNAPS_F_VERSION_NO"
+        );
+        assertThat(query).contains(
+            "CNAPS_QUERY_MAX_ROWS", "page_no = 1", "page_size = 10",
+            "CNAPS_F_SERIAL_NO", "CNAPS_F_VOUCHER_NO", "CNAPS_F_PAYEE_NAME",
+            "CNAPS_F_PAYEE_ACCT", "CNAPS_F_INCLUDE_DELETED",
+            "CNAPS_STATUS_PENDING_REVIEW", "cnaps_put_voucher_occurrence",
+            "CNAPS_F_PAGE_NO", "CNAPS_F_PAGE_SIZE", "CNAPS_F_TOTAL_ELEMENTS"
+        );
+    }
+
+    @Test
+    void nativeReferenceQueriesReturnSupportedDictionariesAndFilteredBankPage() throws Exception {
+        String dict = Files.readString(root.resolve("tuxedo-server/src/services/dict_query.c"));
+        String bank = Files.readString(root.resolve("tuxedo-server/src/services/bank_query.c"));
+
+        assertThat(dict).contains(
+            "BUSINESS_TYPE", "PRIORITY", "FEE_CHARGE_MODE", "SEND_MODE", "DEBIT_MODE",
+            "FAX_FLAG", "SYSTEM_TYPE", "02102", "NORM", "CNAPS", "2003",
+            "cnaps_put_string_occurrence"
+        );
+        assertThat(bank).contains(
+            "CNAPS_F_BANK_NO", "CNAPS_F_BANK_NAME", "CNAPS_F_CITY", "CNAPS_F_SYSTEM_TYPE",
+            "CNAPS_F_KEYWORD", "strstr", "CNAPS_F_PAGE_NO", "CNAPS_F_PAGE_SIZE",
+            "CNAPS_F_TOTAL_ELEMENTS"
+        );
+    }
 }

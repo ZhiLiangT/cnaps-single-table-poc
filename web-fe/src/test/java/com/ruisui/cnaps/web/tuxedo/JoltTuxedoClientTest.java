@@ -14,6 +14,7 @@ class JoltTuxedoClientTest {
         FakeRemoteService remoteService = new FakeRemoteService();
         Method readResponseFields = JoltTuxedoClient.class.getDeclaredMethod(
             "readResponseFields",
+            String.class,
             Class.class,
             Object.class
         );
@@ -22,6 +23,7 @@ class JoltTuxedoClientTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> fields = (Map<String, Object>) readResponseFields.invoke(
             client,
+            "CNAPS5702I",
             FakeRemoteService.class,
             remoteService
         );

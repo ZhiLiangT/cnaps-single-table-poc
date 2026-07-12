@@ -327,76 +327,37 @@ static int define_long(OCIStmt *stmt, int position, long *value, sb2 *indicator)
     return oci_check(OCIDefineByPos(stmt, &define, g_err, position, value, sizeof(*value), SQLT_INT, indicator, NULL, NULL, OCI_DEFAULT), "OCIDefineByPos(long)");
 }
 
-int db_find_voucher(const char *bill_id, cnaps_voucher_row *row)
-{
-    static const char *sql =
-        "SELECT BILL_ID, TO_CHAR(WORK_DATE, 'YYYY-MM-DD'), BRANCH_NO, OPERATOR_NO, SERIAL_NO, "
-        "BUSINESS_TYPE, ACCOUNT_PART1, ACCOUNT_PART2, ACCOUNT_PART3, "
-        "NVL(ACCOUNT_NAME, ''), NVL(PAYER_NAME, ''), PAYEE_ACCOUNT_NO, PAYEE_NAME, "
-        "NVL(PRIORITY, ''), NVL(RECEIVE_BANK_NO, ''), NVL(RECEIVE_BANK_NAME, ''), "
-        "NVL(SYSTEM_TYPE, ''), TO_CHAR(AMOUNT, 'FM9999999999999990D00'), "
-        "NVL(DEBIT_MODE, ''), TO_CHAR(NVL(FEE_AMOUNT, 0), 'FM9999999999999990D00'), "
-        "NVL(FEE_CHARGE_MODE, ''), NVL(SEND_MODE, ''), NVL(FAX_FLAG, ''), "
-        "NVL(VOUCHER_NO, ''), NVL(REMARK, ''), STATUS, "
-        "NVL(CHECKER_NO, ''), NVL(TO_CHAR(CHECKER_TIME, 'YYYY-MM-DD HH24:MI:SS'), ''), "
-        "NVL(REVIEW_COMMENT, ''), NVL(REJECT_REASON, ''), NVL(DELETE_REASON, ''), "
-        "NVL(DELETE_OPERATOR_NO, ''), NVL(TO_CHAR(DELETE_TIME, 'YYYY-MM-DD HH24:MI:SS'), ''), "
-        "NVL(LAST_ACTION, ''), NVL(LAST_OPERATOR_NO, ''), NVL(LAST_REQUEST_ID, ''), "
-        "NVL(TO_CHAR(LAST_ACTION_TIME, 'YYYY-MM-DD HH24:MI:SS'), ''), "
-        "NVL(TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS'), ''), "
-        "NVL(TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS'), ''), NVL(VERSION_NO, 1) "
-        "FROM T_CNAPS_BILL_POC WHERE BILL_ID=:bill_id";
-    OCIStmt *stmt = NULL;
-    sword status;
-    sb2 indicators[40] = {0};
-    char *fields[39];
+#define CNAPS_VOUCHER_SELECT_COLUMNS \
+    "BILL_ID, TO_CHAR(WORK_DATE, 'YYYY-MM-DD'), BRANCH_NO, OPERATOR_NO, SERIAL_NO, " \
+    "BUSINESS_TYPE, ACCOUNT_PART1, ACCOUNT_PART2, ACCOUNT_PART3, " \
+    "NVL(ACCOUNT_NAME, ''), NVL(PAYER_NAME, ''), PAYEE_ACCOUNT_NO, PAYEE_NAME, " \
+    "NVL(PRIORITY, ''), NVL(RECEIVE_BANK_NO, ''), NVL(RECEIVE_BANK_NAME, ''), " \
+    "NVL(SYSTEM_TYPE, ''), TO_CHAR(AMOUNT, 'FM9999999999999990D00'), " \
+    "NVL(DEBIT_MODE, ''), TO_CHAR(NVL(FEE_AMOUNT, 0), 'FM9999999999999990D00'), " \
+    "NVL(FEE_CHARGE_MODE, ''), NVL(SEND_MODE, ''), NVL(FAX_FLAG, ''), " \
+    "NVL(VOUCHER_NO, ''), NVL(REMARK, ''), STATUS, " \
+    "NVL(CHECKER_NO, ''), NVL(TO_CHAR(CHECKER_TIME, 'YYYY-MM-DD HH24:MI:SS'), ''), " \
+    "NVL(REVIEW_COMMENT, ''), NVL(REJECT_REASON, ''), NVL(DELETE_REASON, ''), " \
+    "NVL(DELETE_OPERATOR_NO, ''), NVL(TO_CHAR(DELETE_TIME, 'YYYY-MM-DD HH24:MI:SS'), ''), " \
+    "NVL(LAST_ACTION, ''), NVL(LAST_OPERATOR_NO, ''), NVL(LAST_REQUEST_ID, ''), " \
+    "NVL(TO_CHAR(LAST_ACTION_TIME, 'YYYY-MM-DD HH24:MI:SS'), ''), " \
+    "NVL(TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS'), ''), " \
+    "NVL(TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS'), ''), NVL(VERSION_NO, 1) "
 
-    memset(row, 0, sizeof(*row));
-    fields[0] = row->bill_id;
-    fields[1] = row->work_date;
-    fields[2] = row->branch_no;
-    fields[3] = row->operator_no;
-    fields[4] = row->serial_no;
-    fields[5] = row->business_type;
-    fields[6] = row->account_part1;
-    fields[7] = row->account_part2;
-    fields[8] = row->account_part3;
-    fields[9] = row->account_name;
-    fields[10] = row->payer_name;
-    fields[11] = row->payee_account_no;
-    fields[12] = row->payee_name;
-    fields[13] = row->priority;
-    fields[14] = row->receive_bank_no;
-    fields[15] = row->receive_bank_name;
-    fields[16] = row->system_type;
-    fields[17] = row->amount;
-    fields[18] = row->debit_mode;
-    fields[19] = row->fee_amount;
-    fields[20] = row->fee_charge_mode;
-    fields[21] = row->send_mode;
-    fields[22] = row->fax_flag;
-    fields[23] = row->voucher_no;
-    fields[24] = row->remark;
-    fields[25] = row->status;
-    fields[26] = row->checker_no;
-    fields[27] = row->checker_time;
-    fields[28] = row->review_comment;
-    fields[29] = row->reject_reason;
-    fields[30] = row->delete_reason;
-    fields[31] = row->delete_operator_no;
-    fields[32] = row->delete_time;
-    fields[33] = row->last_action;
-    fields[34] = row->last_operator_no;
-    fields[35] = row->last_request_id;
-    fields[36] = row->last_action_time;
-    fields[37] = row->created_at;
-    fields[38] = row->updated_at;
-    if (prepare_stmt(sql, &stmt) != 0) {
-        return -1;
-    }
-    if (bind_text(stmt, ":bill_id", bill_id) != 0) goto define_error;
+#define CNAPS_QUERY_PREDICATES \
+    "WHERE (:work_date IS NULL OR WORK_DATE=TO_DATE(:work_date, 'YYYY-MM-DD')) " \
+    "AND (:branch_no IS NULL OR BRANCH_NO=:branch_no) " \
+    "AND (:status IS NULL OR STATUS=:status) " \
+    "AND (:serial_no IS NULL OR SERIAL_NO=:serial_no) " \
+    "AND (:voucher_no IS NULL OR VOUCHER_NO=:voucher_no) " \
+    "AND (:payee_name IS NULL OR PAYEE_NAME LIKE '%' || :payee_name || '%') " \
+    "AND (:payee_account_no IS NULL OR PAYEE_ACCOUNT_NO=:payee_account_no) " \
+    "AND (:include_deleted=1 OR STATUS<>'40_DELETED') "
+
+static int define_voucher_row(OCIStmt *stmt, cnaps_voucher_row *row, sb2 indicators[40])
+{
 #define DEFINE_TEXT(POSITION, MEMBER) do { \
-    if (define_text(stmt, POSITION, row->MEMBER, sizeof(row->MEMBER), &indicators[(POSITION) - 1]) != 0) goto define_error; \
+    if (define_text(stmt, POSITION, row->MEMBER, sizeof(row->MEMBER), &indicators[(POSITION) - 1]) != 0) return -1; \
 } while (0)
     DEFINE_TEXT(1, bill_id);
     DEFINE_TEXT(2, work_date);
@@ -438,7 +399,48 @@ int db_find_voucher(const char *bill_id, cnaps_voucher_row *row)
     DEFINE_TEXT(38, created_at);
     DEFINE_TEXT(39, updated_at);
 #undef DEFINE_TEXT
-    if (define_long(stmt, 40, &row->version_no, &indicators[39]) != 0) goto define_error;
+    return define_long(stmt, 40, &row->version_no, &indicators[39]);
+}
+
+static void clear_voucher_nulls(cnaps_voucher_row *row, const sb2 indicators[40])
+{
+    char *fields[39] = {
+        row->bill_id, row->work_date, row->branch_no, row->operator_no, row->serial_no,
+        row->business_type, row->account_part1, row->account_part2, row->account_part3,
+        row->account_name, row->payer_name, row->payee_account_no, row->payee_name,
+        row->priority, row->receive_bank_no, row->receive_bank_name, row->system_type,
+        row->amount, row->debit_mode, row->fee_amount, row->fee_charge_mode, row->send_mode,
+        row->fax_flag, row->voucher_no, row->remark, row->status, row->checker_no,
+        row->checker_time, row->review_comment, row->reject_reason, row->delete_reason,
+        row->delete_operator_no, row->delete_time, row->last_action, row->last_operator_no,
+        row->last_request_id, row->last_action_time, row->created_at, row->updated_at
+    };
+
+    for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); ++i) {
+        if (indicators[i] == -1) {
+            fields[i][0] = '\0';
+        }
+    }
+    if (indicators[39] == -1) {
+        row->version_no = 1;
+    }
+}
+
+int db_find_voucher(const char *bill_id, cnaps_voucher_row *row)
+{
+    static const char *sql =
+        "SELECT " CNAPS_VOUCHER_SELECT_COLUMNS
+        "FROM T_CNAPS_BILL_POC WHERE BILL_ID=:bill_id";
+    OCIStmt *stmt = NULL;
+    sword status;
+    sb2 indicators[40] = {0};
+
+    memset(row, 0, sizeof(*row));
+    if (prepare_stmt(sql, &stmt) != 0) {
+        return -1;
+    }
+    if (bind_text(stmt, ":bill_id", bill_id) != 0) goto define_error;
+    if (define_voucher_row(stmt, row, indicators) != 0) goto define_error;
     if (oci_check(OCIStmtExecute(g_svc, stmt, g_err, 0, 0, NULL, NULL, OCI_DEFAULT), "OCIStmtExecute(find)") != 0) {
         free_stmt(stmt);
         return -1;
@@ -451,11 +453,7 @@ int db_find_voucher(const char *bill_id, cnaps_voucher_row *row)
     if (oci_check(status, "OCIStmtFetch2(find)") != 0) {
         return -1;
     }
-    for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); ++i) {
-        if (indicators[i] == -1) {
-            fields[i][0] = '\0';
-        }
-    }
+    clear_voucher_nulls(row, indicators);
     return 0;
 
 define_error:
@@ -463,30 +461,100 @@ define_error:
     return -1;
 }
 
-int db_query_vouchers(const char *work_date, const char *branch_no, const char *status)
+int db_query_vouchers(
+    const char *work_date,
+    const char *branch_no,
+    const char *status,
+    const char *serial_no,
+    const char *voucher_no,
+    const char *payee_name,
+    const char *payee_account_no,
+    int include_deleted,
+    int page_no,
+    int page_size,
+    cnaps_voucher_row *rows,
+    int row_capacity,
+    int *total
+)
 {
-    static const char *sql =
-        "SELECT COUNT(1) FROM T_CNAPS_BILL_POC "
-        "WHERE (:work_date IS NULL OR WORK_DATE=TO_DATE(:work_date, 'YYYY-MM-DD')) "
-        "AND (:branch_no IS NULL OR BRANCH_NO=:branch_no) "
-        "AND (:status IS NULL OR STATUS=:status)";
+    static const char *count_sql =
+        "SELECT COUNT(1) FROM T_CNAPS_BILL_POC " CNAPS_QUERY_PREDICATES;
+    static const char *page_sql =
+        "SELECT " CNAPS_VOUCHER_SELECT_COLUMNS
+        "FROM T_CNAPS_BILL_POC " CNAPS_QUERY_PREDICATES
+        "ORDER BY BILL_ID "
+        "OFFSET :offset_rows ROWS FETCH NEXT :page_size ROWS ONLY";
     OCIStmt *stmt = NULL;
-    int total = 0;
-    OCIDefine *define = NULL;
+    cnaps_voucher_row fetched = {0};
+    sb2 indicators[40] = {0};
+    sword status;
+    long total_value = 0;
+    long include_deleted_value = include_deleted ? 1 : 0;
+    long offset_rows;
+    long page_size_value;
+    int row_count = 0;
 
-    if (prepare_stmt(sql, &stmt) != 0) {
+    if (total == NULL) {
         return -1;
     }
+    *total = 0;
+    if (page_no <= 0) page_no = 1;
+    if (page_size <= 0) page_size = 10;
+    if (rows == NULL || row_capacity <= 0) page_size = 0;
+    if (row_capacity > 0 && page_size > row_capacity) page_size = row_capacity;
+
+    if (prepare_stmt(count_sql, &stmt) != 0) return -1;
     if (bind_text(stmt, ":work_date", work_date) != 0
         || bind_text(stmt, ":branch_no", branch_no) != 0
         || bind_text(stmt, ":status", status) != 0
-        || oci_check(OCIDefineByPos(stmt, &define, g_err, 1, &total, sizeof(total), SQLT_INT, NULL, NULL, NULL, OCI_DEFAULT), "OCIDefineByPos(count)") != 0
-        || oci_check(OCIStmtExecute(g_svc, stmt, g_err, 1, 0, NULL, NULL, OCI_DEFAULT), "OCIStmtExecute(count)") != 0) {
+        || bind_text(stmt, ":serial_no", serial_no) != 0
+        || bind_text(stmt, ":voucher_no", voucher_no) != 0
+        || bind_text(stmt, ":payee_name", payee_name) != 0
+        || bind_text(stmt, ":payee_account_no", payee_account_no) != 0
+        || bind_long(stmt, ":include_deleted", &include_deleted_value) != 0
+        || define_long(stmt, 1, &total_value, NULL) != 0
+        || oci_check(OCIStmtExecute(g_svc, stmt, g_err, 0, 0, NULL, NULL, OCI_DEFAULT), "OCIStmtExecute(count)") != 0
+        || oci_check(OCIStmtFetch2(stmt, g_err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT), "OCIStmtFetch2(count)") != 0) {
         free_stmt(stmt);
         return -1;
     }
     free_stmt(stmt);
-    return total;
+    stmt = NULL;
+    *total = (int)total_value;
+    if (page_size == 0 || total_value == 0) return 0;
+
+    offset_rows = ((long)page_no - 1L) * (long)page_size;
+    page_size_value = page_size;
+    if (prepare_stmt(page_sql, &stmt) != 0) return -1;
+    if (bind_text(stmt, ":work_date", work_date) != 0
+        || bind_text(stmt, ":branch_no", branch_no) != 0
+        || bind_text(stmt, ":status", status) != 0
+        || bind_text(stmt, ":serial_no", serial_no) != 0
+        || bind_text(stmt, ":voucher_no", voucher_no) != 0
+        || bind_text(stmt, ":payee_name", payee_name) != 0
+        || bind_text(stmt, ":payee_account_no", payee_account_no) != 0
+        || bind_long(stmt, ":include_deleted", &include_deleted_value) != 0
+        || bind_long(stmt, ":offset_rows", &offset_rows) != 0
+        || bind_long(stmt, ":page_size", &page_size_value) != 0
+        || define_voucher_row(stmt, &fetched, indicators) != 0
+        || oci_check(OCIStmtExecute(g_svc, stmt, g_err, 0, 0, NULL, NULL, OCI_DEFAULT), "OCIStmtExecute(query)") != 0) {
+        free_stmt(stmt);
+        return -1;
+    }
+    while (row_count < page_size) {
+        status = OCIStmtFetch2(stmt, g_err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT);
+        if (status == OCI_NO_DATA) break;
+        if (oci_check(status, "OCIStmtFetch2(query)") != 0) {
+            free_stmt(stmt);
+            return -1;
+        }
+        clear_voucher_nulls(&fetched, indicators);
+        rows[row_count++] = fetched;
+        memset(&fetched, 0, sizeof(fetched));
+        memset(indicators, 0, sizeof(indicators));
+    }
+    free_stmt(stmt);
+    return row_count;
 }
 
 int db_next_serial_no(const char *work_date, const char *branch_no, char *serial_no, int serial_no_size)

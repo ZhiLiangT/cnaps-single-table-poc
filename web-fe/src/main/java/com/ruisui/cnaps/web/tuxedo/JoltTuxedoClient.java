@@ -8,17 +8,39 @@ import java.util.List;
 import java.util.Map;
 
 public class JoltTuxedoClient implements TuxedoClient {
+    private static final int MAX_RESPONSE_OCCURRENCES = 1_000;
+    private static final List<String> ENVELOPE_FIELDS = List.of("RESP_CODE", "RESP_MSG");
+    private static final List<String> PAGE_SERVICES = List.of("BANKQRY", "CNAPS4609Q", "CNAPS5702Q");
+    private static final List<String> DICTIONARY_FIELDS = List.of(
+        "DICT_TYPE", "DICT_CODE", "DICT_NAME", "SORT_NO"
+    );
+    private static final List<String> BANK_FIELDS = List.of(
+        "BANK_NO", "BANK_NAME", "CITY", "SYSTEM_TYPE"
+    );
+    private static final List<String> VOUCHER_FIELDS = List.of(
+        "BILL_ID", "WORK_DATE", "BRANCH_NO", "OPERATOR_NO", "SERIAL_NO", "BUSINESS_TYPE",
+        "ACCOUNT_PART1", "ACCOUNT_PART2", "ACCOUNT_PART3", "ACCOUNT_NAME", "PAYER_NAME",
+        "PAYEE_ACCT", "PAYEE_NAME", "PRIORITY", "RECEIVE_BANK_NO", "RECEIVE_BANK_NAME",
+        "SYSTEM_TYPE", "AMOUNT", "DEBIT_MODE", "FEE_AMOUNT", "FEE_CHARGE_MODE", "SEND_MODE",
+        "FAX_FLAG", "VOUCHER_NO", "REMARK", "STATUS", "CHECKER_NO", "CHECKER_TIME",
+        "REJECT_REASON", "REVIEW_COMMENT", "DELETE_REASON", "DELETE_OPERATOR_NO", "DELETE_TIME",
+        "LAST_ACTION", "LAST_OPERATOR_NO", "LAST_REQUEST_ID", "LAST_ACTION_TIME", "CREATED_AT",
+        "UPDATED_AT", "VERSION_NO"
+    );
     private static final List<String> RESPONSE_FIELDS = List.of(
         "RESP_CODE", "RESP_MSG", "WEBFE", "TUXEDO", "ORACLE", "SERVICE", "CHECK_TIME",
-        "DICT_TYPE", "DICT_CODE", "DICT_NAME", "SORT_NO", "BANK_NO", "BANK_NAME",
-        "BILL_ID", "SERIAL_NO", "WORK_DATE", "BUSINESS_TYPE", "ACCOUNT_PART1", "ACCOUNT_PART2", "ACCOUNT_PART3",
+        "DICT_TYPE", "DICT_CODE", "DICT_NAME", "SORT_NO", "BANK_NO", "BANK_NAME", "CITY",
+        "BILL_ID", "SERIAL_NO", "WORK_DATE", "BRANCH_NO", "OPERATOR_NO", "BUSINESS_TYPE", "ACCOUNT_PART1", "ACCOUNT_PART2", "ACCOUNT_PART3",
         "ACCOUNT_NAME", "PAYER_NAME", "PAYEE_ACCT", "PAYEE_NAME", "PRIORITY", "RECEIVE_BANK_NO",
         "RECEIVE_BANK_NAME", "SYSTEM_TYPE", "AMOUNT", "DEBIT_MODE", "FEE_AMOUNT", "FEE_CHARGE_MODE",
         "SEND_MODE", "FAX_FLAG", "VOUCHER_NO", "REMARK", "STATUS", "REJECT_REASON", "REVIEW_COMMENT",
         "DELETE_REASON", "DELETE_OPERATOR_NO", "CHECKER_NO", "CHECKER_TIME", "LAST_ACTION", "INCLUDE_DELETED",
-        "LAST_OPERATOR_NO", "LAST_REQUEST_ID", "PAGE_NO", "PAGE_SIZE", "TOTAL_ELEMENTS", "TOTAL_PAGES"
+        "LAST_OPERATOR_NO", "LAST_REQUEST_ID", "LAST_ACTION_TIME", "CREATED_AT", "UPDATED_AT", "VERSION_NO",
+        "PAGE_NO", "PAGE_SIZE", "TOTAL_ELEMENTS", "TOTAL_PAGES"
     );
-    private static final List<String> NUMERIC_FIELDS = List.of("PAGE_NO", "PAGE_SIZE", "TOTAL_ELEMENTS", "TOTAL_PAGES", "SORT_NO");
+    private static final List<String> NUMERIC_FIELDS = List.of(
+        "PAGE_NO", "PAGE_SIZE", "TOTAL_ELEMENTS", "TOTAL_PAGES", "SORT_NO", "VERSION_NO"
+    );
 
     private final TuxedoRuntimeConfig config;
     private final ClassLoader classLoader;
@@ -65,7 +87,7 @@ public class JoltTuxedoClient implements TuxedoClient {
             }
             callRemoteService(remoteServiceClass, remoteService);
 
-            Map<String, Object> fields = readResponseFields(remoteServiceClass, remoteService);
+            Map<String, Object> fields = readResponseFields(serviceName, remoteServiceClass, remoteService);
             String respCode = stringValue(fields.getOrDefault("RESP_CODE", "0000"));
             String respMsg = stringValue(fields.getOrDefault("RESP_MSG", "success"));
             if ("0000".equals(respCode)) {
@@ -148,10 +170,56 @@ public class JoltTuxedoClient implements TuxedoClient {
         }
     }
 
-    private Map<String, Object> readResponseFields(Class<?> remoteServiceClass, Object remoteService)
+    private Map<String, Object> readResponseFields(
+        String serviceName,
+        Class<?> remoteServiceClass,
+        Object remoteService
+    )
         throws ReflectiveOperationException {
+        if ("DICTQRY".equals(serviceName)) {
+            Map<String, Object> fields = readFields(remoteServiceClass, remoteService, ENVELOPE_FIELDS);
+            fields.put("_DATA", readOccurrences(
+                remoteServiceClass,
+                remoteService,
+                "DICT_CODE",
+                DICTIONARY_FIELDS,
+                MAX_RESPONSE_OCCURRENCES
+            ));
+            return fields;
+        }
+        if (PAGE_SERVICES.contains(serviceName)) {
+            Map<String, Object> fields = readFields(remoteServiceClass, remoteService, ENVELOPE_FIELDS);
+            int pageNo = positiveInt(getInt(remoteServiceClass, remoteService, "PAGE_NO"), 1);
+            int pageSize = positiveInt(getInt(remoteServiceClass, remoteService, "PAGE_SIZE"), 10);
+            int total = nonNegativeInt(getInt(remoteServiceClass, remoteService, "TOTAL_ELEMENTS"), 0);
+            List<String> recordFields = "BANKQRY".equals(serviceName) ? BANK_FIELDS : VOUCHER_FIELDS;
+            String primaryField = "BANKQRY".equals(serviceName) ? "BANK_NO" : "BILL_ID";
+            int limit = Math.min(Math.min(pageSize, total), MAX_RESPONSE_OCCURRENCES);
+
+            Map<String, Object> page = new LinkedHashMap<>();
+            page.put("PAGE_NO", pageNo);
+            page.put("PAGE_SIZE", pageSize);
+            page.put("TOTAL", total);
+            page.put("RECORDS", readOccurrences(
+                remoteServiceClass,
+                remoteService,
+                primaryField,
+                recordFields,
+                limit
+            ));
+            fields.put("_DATA", page);
+            return fields;
+        }
+        return readFields(remoteServiceClass, remoteService, RESPONSE_FIELDS);
+    }
+
+    private Map<String, Object> readFields(
+        Class<?> remoteServiceClass,
+        Object remoteService,
+        List<String> fieldNames
+    ) throws ReflectiveOperationException {
         Map<String, Object> fields = new LinkedHashMap<>();
-        for (String fieldName : RESPONSE_FIELDS) {
+        for (String fieldName : fieldNames) {
             Object value = NUMERIC_FIELDS.contains(fieldName)
                 ? getInt(remoteServiceClass, remoteService, fieldName)
                 : getString(remoteServiceClass, remoteService, fieldName);
@@ -160,6 +228,86 @@ public class JoltTuxedoClient implements TuxedoClient {
             }
         }
         return fields;
+    }
+
+    private List<Map<String, Object>> readOccurrences(
+        Class<?> remoteServiceClass,
+        Object remoteService,
+        String primaryField,
+        List<String> fieldNames,
+        int limit
+    ) throws ReflectiveOperationException {
+        java.util.ArrayList<Map<String, Object>> records = new java.util.ArrayList<>();
+        for (int occurrence = 0; occurrence < limit; occurrence++) {
+            Object primaryValue = getItem(remoteServiceClass, remoteService, primaryField, occurrence);
+            if (primaryValue == null || "".equals(primaryValue)) {
+                break;
+            }
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put(primaryField, primaryValue);
+            for (String fieldName : fieldNames) {
+                if (primaryField.equals(fieldName)) {
+                    continue;
+                }
+                Object value = getItem(remoteServiceClass, remoteService, fieldName, occurrence);
+                if (value != null && !"".equals(value)) {
+                    record.put(fieldName, value);
+                }
+            }
+            records.add(record);
+        }
+        return List.copyOf(records);
+    }
+
+    private Object getItem(Class<?> remoteServiceClass, Object remoteService, String fieldName, int occurrence)
+        throws ReflectiveOperationException {
+        Method stringMethod = method(
+            remoteServiceClass,
+            "getStringItemDef",
+            String.class,
+            int.class,
+            String.class
+        );
+        Object value = stringMethod == null
+            ? null
+            : invokeGetterOrNull(stringMethod, remoteService, fieldName, occurrence, null);
+        if (value == null && NUMERIC_FIELDS.contains(fieldName)) {
+            Method intMethod = method(
+                remoteServiceClass,
+                "getIntItemDef",
+                String.class,
+                int.class,
+                int.class
+            );
+            value = intMethod == null
+                ? null
+                : invokeGetterOrNull(intMethod, remoteService, fieldName, occurrence, Integer.MIN_VALUE);
+            if (Integer.valueOf(Integer.MIN_VALUE).equals(value)) {
+                value = null;
+            }
+        }
+        if (value instanceof String text && NUMERIC_FIELDS.contains(fieldName) && isInteger(text)) {
+            return Integer.parseInt(text);
+        }
+        return value;
+    }
+
+    private int positiveInt(Object value, int defaultValue) {
+        int parsed = intValue(value, defaultValue);
+        return parsed > 0 ? parsed : defaultValue;
+    }
+
+    private int nonNegativeInt(Object value, int defaultValue) {
+        int parsed = intValue(value, defaultValue);
+        return parsed >= 0 ? parsed : defaultValue;
+    }
+
+    private int intValue(Object value, int defaultValue) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        String text = stringValue(value);
+        return text != null && isInteger(text) ? Integer.parseInt(text) : defaultValue;
     }
 
     private Object getString(Class<?> remoteServiceClass, Object remoteService, String fieldName)

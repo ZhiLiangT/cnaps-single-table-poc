@@ -60,6 +60,44 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void generalQueryMetadataCoversAllFiltersAndRepeatedVoucherFields() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+        String queryMetadata = serviceMetadata(metadata, "CNAPS4609Q");
+
+        assertThat(queryMetadata).contains(
+            "param=WORK_DATE", "param=BRANCH_NO", "param=STATUS", "param=SERIAL_NO",
+            "param=VOUCHER_NO", "param=PAYEE_NAME", "param=PAYEE_ACCT",
+            "param=INCLUDE_DELETED", "param=PAGE_NO", "param=PAGE_SIZE",
+            "param=TOTAL_ELEMENTS", "param=BILL_ID", "param=OPERATOR_NO",
+            "param=BUSINESS_TYPE", "param=ACCOUNT_PART1", "param=ACCOUNT_PART2",
+            "param=ACCOUNT_PART3", "param=ACCOUNT_NAME", "param=PAYER_NAME",
+            "param=PRIORITY", "param=RECEIVE_BANK_NO", "param=RECEIVE_BANK_NAME",
+            "param=SYSTEM_TYPE", "param=AMOUNT", "param=DEBIT_MODE", "param=FEE_AMOUNT",
+            "param=FEE_CHARGE_MODE", "param=SEND_MODE", "param=FAX_FLAG",
+            "param=REMARK", "param=CHECKER_NO", "param=CHECKER_TIME",
+            "param=REJECT_REASON", "param=REVIEW_COMMENT", "param=DELETE_REASON",
+            "param=DELETE_OPERATOR_NO", "param=DELETE_TIME", "param=LAST_ACTION",
+            "param=LAST_OPERATOR_NO", "param=LAST_REQUEST_ID", "param=LAST_ACTION_TIME",
+            "param=CREATED_AT", "param=UPDATED_AT", "param=VERSION_NO"
+        );
+    }
+
+    @Test
+    void referenceMetadataExposesDictionaryArraysAndBankPages() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+
+        assertThat(serviceMetadata(metadata, "DICTQRY")).contains(
+            "param=DICT_TYPE", "param=DICT_CODE", "param=DICT_NAME", "param=SORT_NO"
+        );
+        assertThat(serviceMetadata(metadata, "BANKQRY")).contains(
+            "param=BANK_NO", "param=KEYWORD", "param=CITY", "param=SYSTEM_TYPE",
+            "param=PAGE_NO", "param=PAGE_SIZE", "param=TOTAL_ELEMENTS", "param=BANK_NAME"
+        );
+        assertThat(Files.readString(root.resolve("tuxedo-server/fml/cnaps_poc.fml32")))
+            .contains("CITY", "KEYWORD");
+    }
+
+    @Test
     void operationalScriptsCoverPreflightAndJoltMetadataLoad() {
         assertThat(root.resolve("scripts/preflight.sh")).exists();
         assertThat(root.resolve("scripts/load-jolt-metadata.sh")).exists();
@@ -144,5 +182,11 @@ class DeploymentArtifactTest {
 
     private String normalizeLineEndings(String value) {
         return value.replace("\r\n", "\n");
+    }
+
+    private String serviceMetadata(String metadata, String serviceName) {
+        int start = metadata.indexOf("service=" + serviceName);
+        int end = metadata.indexOf("service=", start + 1);
+        return normalizeLineEndings(metadata.substring(start, end < 0 ? metadata.length() : end));
     }
 }

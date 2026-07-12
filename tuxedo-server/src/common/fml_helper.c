@@ -31,6 +31,32 @@ int cnaps_get_string(FBFR32 *fbfr, const char *field_name, char *out, size_t out
 
 int cnaps_put_string(FBFR32 *fbfr, const char *field_name, const char *value)
 {
+    return cnaps_put_string_occurrence(fbfr, field_name, 0, value);
+}
+
+int cnaps_get_long(FBFR32 *fbfr, const char *field_name, long *out)
+{
+    FLDID32 field_id;
+    FLDLEN32 len = (FLDLEN32)sizeof(*out);
+
+    if (fbfr == NULL || field_name == NULL || out == NULL) {
+        return -1;
+    }
+    field_id = Fldid32((char *)field_name);
+    if (field_id == BADFLDID) {
+        userlog("unknown FML32 field: %s", field_name);
+        return -1;
+    }
+    return Fget32(fbfr, field_id, 0, (char *)out, &len) < 0 ? -1 : 0;
+}
+
+int cnaps_put_string_occurrence(
+    FBFR32 *fbfr,
+    const char *field_name,
+    FLDOCC32 occurrence,
+    const char *value
+)
+{
     FLDID32 field_id;
     const char *safe_value = value == NULL ? "" : value;
 
@@ -44,7 +70,7 @@ int cnaps_put_string(FBFR32 *fbfr, const char *field_name, const char *value)
         return -1;
     }
 
-    if (Fchg32(fbfr, field_id, 0, (char *)safe_value, 0) < 0) {
+    if (Fchg32(fbfr, field_id, occurrence, (char *)safe_value, 0) < 0) {
         userlog("failed to change FML32 field %s: %s", field_name, Fstrerror32(Ferror32));
         return -1;
     }
@@ -52,6 +78,11 @@ int cnaps_put_string(FBFR32 *fbfr, const char *field_name, const char *value)
 }
 
 int cnaps_put_long(FBFR32 *fbfr, const char *field_name, long value)
+{
+    return cnaps_put_long_occurrence(fbfr, field_name, 0, value);
+}
+
+int cnaps_put_long_occurrence(FBFR32 *fbfr, const char *field_name, FLDOCC32 occurrence, long value)
 {
     FLDID32 field_id;
     if (fbfr == NULL || field_name == NULL) {
@@ -62,7 +93,7 @@ int cnaps_put_long(FBFR32 *fbfr, const char *field_name, long value)
         userlog("unknown FML32 field: %s", field_name);
         return -1;
     }
-    if (Fchg32(fbfr, field_id, 0, (char *)&value, 0) < 0) {
+    if (Fchg32(fbfr, field_id, occurrence, (char *)&value, 0) < 0) {
         userlog("failed to change FML32 long field %s: %s", field_name, Fstrerror32(Ferror32));
         return -1;
     }
@@ -71,50 +102,57 @@ int cnaps_put_long(FBFR32 *fbfr, const char *field_name, long value)
 
 void cnaps_put_voucher(FBFR32 *fbfr, const void *value)
 {
+    cnaps_put_voucher_occurrence(fbfr, value, 0);
+}
+
+void cnaps_put_voucher_occurrence(FBFR32 *fbfr, const void *value, FLDOCC32 occurrence)
+{
     const cnaps_voucher_row *row = (const cnaps_voucher_row *)value;
     if (row == NULL) {
         return;
     }
-    cnaps_put_string(fbfr, CNAPS_F_BILL_ID, row->bill_id);
-    cnaps_put_string(fbfr, CNAPS_F_WORK_DATE, row->work_date);
-    cnaps_put_string(fbfr, CNAPS_F_BRANCH_NO, row->branch_no);
-    cnaps_put_string(fbfr, CNAPS_F_OPERATOR_NO, row->operator_no);
-    cnaps_put_string(fbfr, CNAPS_F_SERIAL_NO, row->serial_no);
-    cnaps_put_string(fbfr, CNAPS_F_BUSINESS_TYPE, row->business_type);
-    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_PART1, row->account_part1);
-    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_PART2, row->account_part2);
-    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_PART3, row->account_part3);
-    cnaps_put_string(fbfr, CNAPS_F_ACCOUNT_NAME, row->account_name);
-    cnaps_put_string(fbfr, CNAPS_F_PAYER_NAME, row->payer_name);
-    cnaps_put_string(fbfr, CNAPS_F_PAYEE_ACCT, row->payee_account_no);
-    cnaps_put_string(fbfr, CNAPS_F_PAYEE_NAME, row->payee_name);
-    cnaps_put_string(fbfr, CNAPS_F_PRIORITY, row->priority);
-    cnaps_put_string(fbfr, CNAPS_F_RECEIVE_BANK_NO, row->receive_bank_no);
-    cnaps_put_string(fbfr, CNAPS_F_RECEIVE_BANK_NAME, row->receive_bank_name);
-    cnaps_put_string(fbfr, CNAPS_F_SYSTEM_TYPE, row->system_type);
-    cnaps_put_string(fbfr, CNAPS_F_AMOUNT, row->amount);
-    cnaps_put_string(fbfr, CNAPS_F_DEBIT_MODE, row->debit_mode);
-    cnaps_put_string(fbfr, CNAPS_F_FEE_AMOUNT, row->fee_amount);
-    cnaps_put_string(fbfr, CNAPS_F_FEE_CHARGE_MODE, row->fee_charge_mode);
-    cnaps_put_string(fbfr, CNAPS_F_SEND_MODE, row->send_mode);
-    cnaps_put_string(fbfr, CNAPS_F_FAX_FLAG, row->fax_flag);
-    cnaps_put_string(fbfr, CNAPS_F_VOUCHER_NO, row->voucher_no);
-    cnaps_put_string(fbfr, CNAPS_F_REMARK, row->remark);
-    cnaps_put_string(fbfr, CNAPS_F_STATUS, row->status);
-    cnaps_put_string(fbfr, CNAPS_F_CHECKER_NO, row->checker_no);
-    cnaps_put_string(fbfr, CNAPS_F_CHECKER_TIME, row->checker_time);
-    cnaps_put_string(fbfr, CNAPS_F_REJECT_REASON, row->reject_reason);
-    cnaps_put_string(fbfr, CNAPS_F_REVIEW_COMMENT, row->review_comment);
-    cnaps_put_string(fbfr, CNAPS_F_DELETE_REASON, row->delete_reason);
-    cnaps_put_string(fbfr, CNAPS_F_DELETE_OPERATOR_NO, row->delete_operator_no);
-    cnaps_put_string(fbfr, CNAPS_F_DELETE_TIME, row->delete_time);
-    cnaps_put_string(fbfr, CNAPS_F_LAST_ACTION, row->last_action);
-    cnaps_put_string(fbfr, CNAPS_F_LAST_OPERATOR_NO, row->last_operator_no);
-    cnaps_put_string(fbfr, CNAPS_F_LAST_REQUEST_ID, row->last_request_id);
-    cnaps_put_string(fbfr, CNAPS_F_LAST_ACTION_TIME, row->last_action_time);
-    cnaps_put_string(fbfr, CNAPS_F_CREATED_AT, row->created_at);
-    cnaps_put_string(fbfr, CNAPS_F_UPDATED_AT, row->updated_at);
-    cnaps_put_long(fbfr, CNAPS_F_VERSION_NO, row->version_no);
+#define PUT_STRING(FIELD, MEMBER) cnaps_put_string_occurrence(fbfr, FIELD, occurrence, row->MEMBER)
+    PUT_STRING(CNAPS_F_BILL_ID, bill_id);
+    PUT_STRING(CNAPS_F_WORK_DATE, work_date);
+    PUT_STRING(CNAPS_F_BRANCH_NO, branch_no);
+    PUT_STRING(CNAPS_F_OPERATOR_NO, operator_no);
+    PUT_STRING(CNAPS_F_SERIAL_NO, serial_no);
+    PUT_STRING(CNAPS_F_BUSINESS_TYPE, business_type);
+    PUT_STRING(CNAPS_F_ACCOUNT_PART1, account_part1);
+    PUT_STRING(CNAPS_F_ACCOUNT_PART2, account_part2);
+    PUT_STRING(CNAPS_F_ACCOUNT_PART3, account_part3);
+    PUT_STRING(CNAPS_F_ACCOUNT_NAME, account_name);
+    PUT_STRING(CNAPS_F_PAYER_NAME, payer_name);
+    PUT_STRING(CNAPS_F_PAYEE_ACCT, payee_account_no);
+    PUT_STRING(CNAPS_F_PAYEE_NAME, payee_name);
+    PUT_STRING(CNAPS_F_PRIORITY, priority);
+    PUT_STRING(CNAPS_F_RECEIVE_BANK_NO, receive_bank_no);
+    PUT_STRING(CNAPS_F_RECEIVE_BANK_NAME, receive_bank_name);
+    PUT_STRING(CNAPS_F_SYSTEM_TYPE, system_type);
+    PUT_STRING(CNAPS_F_AMOUNT, amount);
+    PUT_STRING(CNAPS_F_DEBIT_MODE, debit_mode);
+    PUT_STRING(CNAPS_F_FEE_AMOUNT, fee_amount);
+    PUT_STRING(CNAPS_F_FEE_CHARGE_MODE, fee_charge_mode);
+    PUT_STRING(CNAPS_F_SEND_MODE, send_mode);
+    PUT_STRING(CNAPS_F_FAX_FLAG, fax_flag);
+    PUT_STRING(CNAPS_F_VOUCHER_NO, voucher_no);
+    PUT_STRING(CNAPS_F_REMARK, remark);
+    PUT_STRING(CNAPS_F_STATUS, status);
+    PUT_STRING(CNAPS_F_CHECKER_NO, checker_no);
+    PUT_STRING(CNAPS_F_CHECKER_TIME, checker_time);
+    PUT_STRING(CNAPS_F_REJECT_REASON, reject_reason);
+    PUT_STRING(CNAPS_F_REVIEW_COMMENT, review_comment);
+    PUT_STRING(CNAPS_F_DELETE_REASON, delete_reason);
+    PUT_STRING(CNAPS_F_DELETE_OPERATOR_NO, delete_operator_no);
+    PUT_STRING(CNAPS_F_DELETE_TIME, delete_time);
+    PUT_STRING(CNAPS_F_LAST_ACTION, last_action);
+    PUT_STRING(CNAPS_F_LAST_OPERATOR_NO, last_operator_no);
+    PUT_STRING(CNAPS_F_LAST_REQUEST_ID, last_request_id);
+    PUT_STRING(CNAPS_F_LAST_ACTION_TIME, last_action_time);
+    PUT_STRING(CNAPS_F_CREATED_AT, created_at);
+    PUT_STRING(CNAPS_F_UPDATED_AT, updated_at);
+#undef PUT_STRING
+    cnaps_put_long_occurrence(fbfr, CNAPS_F_VERSION_NO, occurrence, row->version_no);
 }
 
 void cnaps_return_response(TPSVCINFO *rqst, int success, const char *resp_code, const char *resp_msg)

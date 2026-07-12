@@ -3,6 +3,7 @@
 ## Scope and baseline
 
 - Baseline: `932ed19631997a550a8b874cd34d57ad26e81c1b`
+- Implementation commit: `2ce32a80341452f9116eed509de49973e76e6012`
 - Findings source: `.superpowers/sdd/final-review-findings.md`
 - Design source: `docs/superpowers/specs/2026-07-10-headerless-v03-poc-api-design.md`
 - Constraints preserved: one voucher table; no account/auth/role/permission logic; no business request headers; same-operator review remains allowed; native query/detail ordering remains unchanged.

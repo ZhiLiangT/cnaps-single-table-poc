@@ -173,6 +173,25 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void partyAddressFieldsAreCreateUpdateInputsAndDetailOnlyOutputs() throws Exception {
+        String fml = Files.readString(root.resolve("tuxedo-server/fml/cnaps_poc.fml32"));
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+
+        assertThat(fml).contains(
+            "PAYER_ADDRESS   12042   string",
+            "PAYEE_ADDRESS   12043   string",
+            "PAYER_BANK_NAME 12044   string"
+        );
+        for (String field : new String[] {"PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME"}) {
+            assertScalarParam(metadata, "CNAPS5701E", field, "string", "in");
+            assertScalarParam(metadata, "CNAPS5701U", field, "string", "in");
+            assertScalarParam(metadata, "CNAPS5702I", field, "string", "out");
+            assertThat(serviceMetadata(metadata, "CNAPS4609Q")).doesNotContain("param=" + field);
+            assertThat(serviceMetadata(metadata, "CNAPS5702Q")).doesNotContain("param=" + field);
+        }
+    }
+
+    @Test
     void pageRequestAndEnvelopeMetadataRemainScalarAndErrorsUseOuterr() throws Exception {
         String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
 
@@ -327,6 +346,22 @@ class DeploymentArtifactTest {
         assertThat(activeErrorCodes).containsExactly(
             "0000", "2001", "2002", "2003", "3001", "3003", "3004",
             "4001", "4002", "4003", "9999"
+        );
+    }
+
+    @Test
+    void publicDocsDescribePartyAddressFieldsAndRepeatableMigration() throws Exception {
+        String frontend = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
+        String database = Files.readString(root.resolve("docs/cnaps-api-database.md"));
+
+        assertThat(frontend).contains(
+            "`payerAddress`", "`payeeAddress`", "`payerBankName`",
+            "空字符串", "256", "128"
+        );
+        assertThat(database).contains(
+            "`payerAddress`", "`payeeAddress`", "`payerBankName`",
+            "PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME",
+            "040_add_party_address_bank_fields.sql"
         );
     }
 

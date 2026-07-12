@@ -98,7 +98,16 @@ class JoltTuxedoClientTest {
             Object expected = "VERSION_NO".equals(voucherField) ? 7L : "value-" + voucherField;
             assertThat(mapped.values()).as(voucherField).contains(expected);
         }
-        assertThat(mapped).containsEntry("deleteTime", "value-DELETE_TIME");
+        assertThat(fields).contains(
+            Map.entry("PAYER_ADDRESS", "value-PAYER_ADDRESS"),
+            Map.entry("PAYEE_ADDRESS", "value-PAYEE_ADDRESS"),
+            Map.entry("PAYER_BANK_NAME", "value-PAYER_BANK_NAME")
+        );
+        assertThat(mapped)
+            .containsEntry("deleteTime", "value-DELETE_TIME")
+            .containsEntry("payerAddress", "value-PAYER_ADDRESS")
+            .containsEntry("payeeAddress", "value-PAYEE_ADDRESS")
+            .containsEntry("payerBankName", "value-PAYER_BANK_NAME");
     }
 
     @Test

@@ -209,8 +209,11 @@ POST /api/cnaps/vouchers
 | `accountPart1` | string | 是 | - | 付款账号一段 |
 | `accountPart2` | string | 是 | - | 付款账号二段 |
 | `accountPart3` | string | 是 | - | 付款账号三段 |
+| `payerAddress` | string | 否 | - | 付款人地址，最长 256 个字符 |
 | `payeeAccountNo` | string | 是 | - | 收款账号 |
 | `payeeName` | string | 是 | - | 收款人名称 |
+| `payeeAddress` | string | 否 | - | 收款人地址，最长 256 个字符 |
+| `payerBankName` | string | 否 | - | 付款人开户行，最长 128 个字符 |
 | `priority` | string | 是 | `NORM` | 优先级 |
 | `systemType` | string | 是 | `CNAPS` | 系统类型 |
 | `amount` | string | 是 | - | 大于 0，最多两位小数 |
@@ -233,8 +236,11 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers" \
     "accountPart3": "000000000001",
     "accountName": "付款账户户名",
     "payerName": "付款人名称",
+    "payerAddress": "上海市浦东新区示例路 1 号",
     "payeeAccountNo": "622200000000000001",
     "payeeName": "收款人名称",
+    "payeeAddress": "北京市朝阳区示例路 2 号",
+    "payerBankName": "中国示例银行上海分行",
     "priority": "NORM",
     "receiveBankNo": "102290000002",
     "receiveBankName": "接收行名称",
@@ -273,7 +279,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers" \
 PUT /api/cnaps/vouchers/{billId}
 ```
 
-Body 可传创建字段；`workDate` 修改时可选，未传时保持原值。修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
+Body 可传创建字段；`workDate` 修改时可选，未传时保持原值。`payerAddress`、`payeeAddress`、`payerBankName` 未传时保留原值，传入非空字符串时覆盖，传入空字符串 `""` 时清空。修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
 
 请求示例：
 
@@ -284,6 +290,9 @@ curl -X PUT "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607070
     "workDate": "2026-07-08",
     "payeeAccountNo": "622200000000000001",
     "payeeName": "收款人名称-修改后",
+    "payerAddress": "上海市浦东新区示例路 3 号",
+    "payeeAddress": "北京市朝阳区示例路 4 号",
+    "payerBankName": "中国示例银行上海分行营业部",
     "amount": "5800.00",
     "remark": "退回后修改"
   }'
@@ -462,8 +471,11 @@ curl "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607070000001"
     "accountPart1": "404045",
     "accountPart2": "00772",
     "accountPart3": "000000000001",
+    "payerAddress": "上海市浦东新区示例路 3 号",
     "payeeAccountNo": "622200000000000001",
     "payeeName": "收款人名称",
+    "payeeAddress": "北京市朝阳区示例路 4 号",
+    "payerBankName": "中国示例银行上海分行营业部",
     "priority": "NORM",
     "systemType": "CNAPS",
     "amount": "5600.00",
@@ -558,8 +570,11 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B20260707
 | `accountPart3` | string | 是 | 付款账号三段 |
 | `accountName` | string | 否 | 付款账户户名 |
 | `payerName` | string | 否 | 付款人名称 |
+| `payerAddress` | string | 否 | 付款人地址，最长 256 个字符 |
 | `payeeAccountNo` | string | 是 | 收款账号 |
 | `payeeName` | string | 是 | 收款人名称 |
+| `payeeAddress` | string | 否 | 收款人地址，最长 256 个字符 |
+| `payerBankName` | string | 否 | 付款人开户行，最长 128 个字符 |
 | `priority` | string | 是 | 优先级 |
 | `receiveBankNo` | string | 否 | 接收行号 |
 | `receiveBankName` | string | 否 | 接收行名称 |
@@ -586,7 +601,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B20260707
 |---|---:|---|---|
 | `0000` | 200 | 成功 | 交易成功 |
 | `2001` | 400 | 必填字段缺失 | 创建缺少必填项、复核退回缺少原因 |
-| `2002` | 400 | 字段格式错误 | 日期或金额格式错误 |
+| `2002` | 400 | 字段格式错误 | 日期、金额格式错误或字段长度超限 |
 | `2003` | 400 | 字典值无效 | 业务种类、优先级等无效 |
 | `3001` | 404 | 单据不存在 | 详情、修改、删除或复核找不到单据 |
 | `3003` | 409 | 当前状态不允许操作 | 已复核单据删除、已删除单据修改 |

@@ -141,8 +141,11 @@ Content-Type: application/json
 | `accountPart3` | string | 是 | `000000000001` | 付款账号组成部分 3。 |
 | `accountName` | string | 否 | `付款账户户名` | 付款账户户名。 |
 | `payerName` | string | 否 | `付款人名称` | 付款人名称。 |
+| `payerAddress` | string | 否 | `上海市浦东新区示例路 1 号` | 付款人地址，最长 256 个字符。 |
 | `payeeAccountNo` | string | 是 | `622200000000000001` | 收款账号。 |
 | `payeeName` | string | 是 | `收款人名称` | 收款人名称。 |
+| `payeeAddress` | string | 否 | `北京市朝阳区示例路 2 号` | 收款人地址，最长 256 个字符。 |
+| `payerBankName` | string | 否 | `中国示例银行上海分行` | 付款人开户行，最长 128 个字符。 |
 | `priority` | string | 是 | `NORM` | 优先级。 |
 | `receiveBankNo` | string | 否 | `102290000002` | 接收行行号。 |
 | `receiveBankName` | string | 否 | `接收行名称` | 接收行名称。 |
@@ -156,7 +159,7 @@ Content-Type: application/json
 | `voucherNo` | string | 否 | `PZ202607080001` | 凭证号。 |
 | `remark` | string | 否 | `验证录入` | 备注。 |
 
-必填字段缺失或空字符串返回 `2001`。字典值不在支持范围内返回 `2003`。金额格式错误、金额小于等于 0、金额超过两位小数返回 `2002`。
+必填字段缺失或空字符串返回 `2001`。字典值不在支持范围内返回 `2003`。金额格式错误、金额小于等于 0、金额超过两位小数或新增字段长度超限返回 `2002`。修改时，三个新增字段未传表示保留原值，非空字符串表示覆盖，空字符串 `""` 表示清空。
 
 ### 4.2 VoucherResponse
 
@@ -172,8 +175,11 @@ Content-Type: application/json
 | `accountPart3` | string | 付款账号组成部分 3。 |
 | `accountName` | string | 付款账户户名。 |
 | `payerName` | string | 付款人名称。 |
+| `payerAddress` | string | 付款人地址。 |
 | `payeeAccountNo` | string | 收款账号。 |
 | `payeeName` | string | 收款人名称。 |
+| `payeeAddress` | string | 收款人地址。 |
+| `payerBankName` | string | 付款人开户行。 |
 | `priority` | string | 优先级。 |
 | `receiveBankNo` | string | 接收行行号。 |
 | `receiveBankName` | string | 接收行名称。 |
@@ -779,8 +785,11 @@ T_CNAPS_BILL_POC
 | `ACCOUNT_PART3` | `VARCHAR2(64)` | 否 | 无 | 付款账号组成部分 3。 |
 | `ACCOUNT_NAME` | `VARCHAR2(128)` | 否 | 无 | 付款账户户名。 |
 | `PAYER_NAME` | `VARCHAR2(128)` | 否 | 无 | 付款人名称。 |
+| `PAYER_ADDRESS` | `VARCHAR2(256 CHAR)` | 否 | 无 | 付款人地址。 |
+| `PAYER_BANK_NAME` | `VARCHAR2(128 CHAR)` | 否 | 无 | 付款人开户行。 |
 | `PAYEE_ACCOUNT_NO` | `VARCHAR2(64)` | 是 | 无 | 收款账号。 |
 | `PAYEE_NAME` | `VARCHAR2(128)` | 是 | 无 | 收款人名称。 |
+| `PAYEE_ADDRESS` | `VARCHAR2(256 CHAR)` | 否 | 无 | 收款人地址。 |
 | `PRIORITY` | `VARCHAR2(12)` | 否 | 无 | 优先级。 |
 | `RECEIVE_BANK_NO` | `VARCHAR2(32)` | 否 | 无 | 接收行行号。 |
 | `RECEIVE_BANK_NAME` | `VARCHAR2(128)` | 否 | 无 | 接收行名称。 |
@@ -834,8 +843,11 @@ CREATE TABLE T_CNAPS_BILL_POC (
   ACCOUNT_PART3 VARCHAR2(64),
   ACCOUNT_NAME VARCHAR2(128),
   PAYER_NAME VARCHAR2(128),
+  PAYER_ADDRESS VARCHAR2(256 CHAR),
+  PAYER_BANK_NAME VARCHAR2(128 CHAR),
   PAYEE_ACCOUNT_NO VARCHAR2(64) NOT NULL,
   PAYEE_NAME VARCHAR2(128) NOT NULL,
+  PAYEE_ADDRESS VARCHAR2(256 CHAR),
   PRIORITY VARCHAR2(12),
   RECEIVE_BANK_NO VARCHAR2(32),
   RECEIVE_BANK_NAME VARCHAR2(128),
@@ -906,6 +918,8 @@ ALTER TABLE T_CNAPS_BILL_POC ADD (
 );
 ```
 
+现有数据库使用 `sql/040_add_party_address_bank_fields.sql` 增量升级。该脚本逐列检查 `USER_TAB_COLUMNS`，可重复执行且不会删除已有数据；部署引用新列的原生服务前必须先执行此迁移。
+
 兼容策略：
 
 - 若仅保留单级复核，继续使用 `CHECKER_NO`、`CHECKER_TIME`、`REVIEW_COMMENT`。
@@ -926,8 +940,11 @@ curl -X POST http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers \
     "accountPart3":"000000000001",
     "accountName":"付款账户户名",
     "payerName":"付款人名称",
+    "payerAddress":"上海市浦东新区示例路 1 号",
     "payeeAccountNo":"622200000000000001",
     "payeeName":"收款人名称",
+    "payeeAddress":"北京市朝阳区示例路 2 号",
+    "payerBankName":"中国示例银行上海分行",
     "priority":"NORM",
     "receiveBankNo":"102290000002",
     "receiveBankName":"接收行名称",

@@ -85,7 +85,16 @@ public class JoltTuxedoClient implements TuxedoClient {
             for (Map.Entry<String, Object> field : request.fields().entrySet()) {
                 putField(remoteServiceClass, remoteService, field.getKey(), field.getValue());
             }
-            callRemoteService(remoteServiceClass, remoteService);
+            try {
+                callRemoteService(remoteServiceClass, remoteService);
+            } catch (InvocationTargetException ex) {
+                Object applicationErrorService = applicationErrorService(ex.getTargetException());
+                if (applicationErrorService == null) {
+                    throw ex;
+                }
+                remoteService = applicationErrorService;
+                remoteServiceClass = remoteService.getClass();
+            }
 
             Map<String, Object> fields = readResponseFields(serviceName, remoteServiceClass, remoteService);
             String respCode = stringValue(fields.getOrDefault("RESP_CODE", "0000"));
@@ -152,10 +161,10 @@ public class JoltTuxedoClient implements TuxedoClient {
             return;
         }
         String text = stringValue(value);
-        if (NUMERIC_FIELDS.contains(name) && isInteger(text)) {
-            Method setInt = method(remoteServiceClass, "setInt", String.class, int.class);
-            if (setInt != null) {
-                setInt.invoke(remoteService, name, Integer.parseInt(text));
+        if (NUMERIC_FIELDS.contains(name) && isLong(text)) {
+            Method setLong = method(remoteServiceClass, "setLong", String.class, long.class);
+            if (setLong != null) {
+                setLong.invoke(remoteService, name, Long.parseLong(text));
                 return;
             }
         }
@@ -189,12 +198,12 @@ public class JoltTuxedoClient implements TuxedoClient {
         }
         if (PAGE_SERVICES.contains(serviceName)) {
             Map<String, Object> fields = readFields(remoteServiceClass, remoteService, ENVELOPE_FIELDS);
-            int pageNo = positiveInt(getInt(remoteServiceClass, remoteService, "PAGE_NO"), 1);
-            int pageSize = positiveInt(getInt(remoteServiceClass, remoteService, "PAGE_SIZE"), 10);
-            int total = nonNegativeInt(getInt(remoteServiceClass, remoteService, "TOTAL_ELEMENTS"), 0);
+            long pageNo = positiveLong(getLong(remoteServiceClass, remoteService, "PAGE_NO"), 1L);
+            long pageSize = positiveLong(getLong(remoteServiceClass, remoteService, "PAGE_SIZE"), 10L);
+            long total = nonNegativeLong(getLong(remoteServiceClass, remoteService, "TOTAL_ELEMENTS"), 0L);
             List<String> recordFields = "BANKQRY".equals(serviceName) ? BANK_FIELDS : VOUCHER_FIELDS;
             String primaryField = "BANKQRY".equals(serviceName) ? "BANK_NO" : "BILL_ID";
-            int limit = Math.min(Math.min(pageSize, total), MAX_RESPONSE_OCCURRENCES);
+            int limit = (int)Math.min(Math.min(pageSize, total), MAX_RESPONSE_OCCURRENCES);
 
             Map<String, Object> page = new LinkedHashMap<>();
             page.put("PAGE_NO", pageNo);
@@ -221,7 +230,7 @@ public class JoltTuxedoClient implements TuxedoClient {
         Map<String, Object> fields = new LinkedHashMap<>();
         for (String fieldName : fieldNames) {
             Object value = NUMERIC_FIELDS.contains(fieldName)
-                ? getInt(remoteServiceClass, remoteService, fieldName)
+                ? getLong(remoteServiceClass, remoteService, fieldName)
                 : getString(remoteServiceClass, remoteService, fieldName);
             if (value != null && !"".equals(value)) {
                 fields.put(fieldName, value);
@@ -272,42 +281,42 @@ public class JoltTuxedoClient implements TuxedoClient {
             ? null
             : invokeGetterOrNull(stringMethod, remoteService, fieldName, occurrence, null);
         if (value == null && NUMERIC_FIELDS.contains(fieldName)) {
-            Method intMethod = method(
+            Method longMethod = method(
                 remoteServiceClass,
-                "getIntItemDef",
+                "getLongItemDef",
                 String.class,
                 int.class,
-                int.class
+                long.class
             );
-            value = intMethod == null
+            value = longMethod == null
                 ? null
-                : invokeGetterOrNull(intMethod, remoteService, fieldName, occurrence, Integer.MIN_VALUE);
-            if (Integer.valueOf(Integer.MIN_VALUE).equals(value)) {
+                : invokeGetterOrNull(longMethod, remoteService, fieldName, occurrence, Long.MIN_VALUE);
+            if (Long.valueOf(Long.MIN_VALUE).equals(value)) {
                 value = null;
             }
         }
-        if (value instanceof String text && NUMERIC_FIELDS.contains(fieldName) && isInteger(text)) {
-            return Integer.parseInt(text);
+        if (value instanceof String text && NUMERIC_FIELDS.contains(fieldName) && isLong(text)) {
+            return Long.parseLong(text);
         }
         return value;
     }
 
-    private int positiveInt(Object value, int defaultValue) {
-        int parsed = intValue(value, defaultValue);
+    private long positiveLong(Object value, long defaultValue) {
+        long parsed = longValue(value, defaultValue);
         return parsed > 0 ? parsed : defaultValue;
     }
 
-    private int nonNegativeInt(Object value, int defaultValue) {
-        int parsed = intValue(value, defaultValue);
+    private long nonNegativeLong(Object value, long defaultValue) {
+        long parsed = longValue(value, defaultValue);
         return parsed >= 0 ? parsed : defaultValue;
     }
 
-    private int intValue(Object value, int defaultValue) {
+    private long longValue(Object value, long defaultValue) {
         if (value instanceof Number number) {
-            return number.intValue();
+            return number.longValue();
         }
         String text = stringValue(value);
-        return text != null && isInteger(text) ? Integer.parseInt(text) : defaultValue;
+        return text != null && isLong(text) ? Long.parseLong(text) : defaultValue;
     }
 
     private Object getString(Class<?> remoteServiceClass, Object remoteService, String fieldName)
@@ -323,13 +332,13 @@ public class JoltTuxedoClient implements TuxedoClient {
         return null;
     }
 
-    private Object getInt(Class<?> remoteServiceClass, Object remoteService, String fieldName)
+    private Object getLong(Class<?> remoteServiceClass, Object remoteService, String fieldName)
         throws ReflectiveOperationException {
-        Method method = method(remoteServiceClass, "getIntDef", String.class, int.class);
+        Method method = method(remoteServiceClass, "getLongDef", String.class, long.class);
         if (method != null) {
-            Object result = invokeGetterOrNull(method, remoteService, fieldName, Integer.MIN_VALUE);
-            if (result instanceof Integer value) {
-                return value == Integer.MIN_VALUE ? null : value;
+            Object result = invokeGetterOrNull(method, remoteService, fieldName, Long.MIN_VALUE);
+            if (result instanceof Number value) {
+                return value.longValue() == Long.MIN_VALUE ? null : value.longValue();
             }
         }
         return getString(remoteServiceClass, remoteService, fieldName);
@@ -361,6 +370,28 @@ public class JoltTuxedoClient implements TuxedoClient {
         throw new NoSuchMethodException(remoteServiceClass.getName() + ".call(Transaction)");
     }
 
+    private Object applicationErrorService(Throwable error) {
+        if (error == null) {
+            return null;
+        }
+        Class<?> type = error.getClass();
+        boolean applicationException = false;
+        for (Class<?> current = type; current != null; current = current.getSuperclass()) {
+            if ("bea.jolt.ApplicationException".equals(current.getName())) {
+                applicationException = true;
+                break;
+            }
+        }
+        if (!applicationException) {
+            return null;
+        }
+        try {
+            return type.getMethod("getObject").invoke(error);
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            return null;
+        }
+    }
+
     private Method method(Class<?> type, String methodName, Class<?>... parameterTypes) {
         try {
             return type.getMethod(methodName, parameterTypes);
@@ -383,6 +414,15 @@ public class JoltTuxedoClient implements TuxedoClient {
     private boolean isInteger(String value) {
         try {
             Integer.parseInt(value);
+            return true;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+    }
+
+    private boolean isLong(String value) {
+        try {
+            Long.parseLong(value);
             return true;
         } catch (NumberFormatException ex) {
             return false;

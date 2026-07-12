@@ -8,6 +8,20 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DeploymentArtifactTest {
+    private static final String[] EXPORTED_SERVICES = {
+        "SYSHEALTH", "DICTQRY", "BANKQRY", "CNAPS5701E", "CNAPS5701U", "CNAPS5701D",
+        "CNAPS4609Q", "CNAPS5702Q", "CNAPS5702I", "CNAPS5702A", "CNAPS5702R"
+    };
+    private static final String[] VOUCHER_RECORD_FIELDS = {
+        "BILL_ID", "WORK_DATE", "BRANCH_NO", "OPERATOR_NO", "SERIAL_NO", "BUSINESS_TYPE",
+        "ACCOUNT_PART1", "ACCOUNT_PART2", "ACCOUNT_PART3", "ACCOUNT_NAME", "PAYER_NAME",
+        "PAYEE_ACCT", "PAYEE_NAME", "PRIORITY", "RECEIVE_BANK_NO", "RECEIVE_BANK_NAME",
+        "SYSTEM_TYPE", "AMOUNT", "DEBIT_MODE", "FEE_AMOUNT", "FEE_CHARGE_MODE", "SEND_MODE",
+        "FAX_FLAG", "VOUCHER_NO", "REMARK", "STATUS", "CHECKER_NO", "CHECKER_TIME",
+        "REJECT_REASON", "REVIEW_COMMENT", "DELETE_REASON", "DELETE_OPERATOR_NO", "DELETE_TIME",
+        "LAST_ACTION", "LAST_OPERATOR_NO", "LAST_REQUEST_ID", "LAST_ACTION_TIME", "CREATED_AT",
+        "UPDATED_AT", "VERSION_NO"
+    };
     private final Path root = Path.of(System.getProperty("user.dir")).getParent();
 
     @Test
@@ -95,6 +109,58 @@ class DeploymentArtifactTest {
         );
         assertThat(Files.readString(root.resolve("tuxedo-server/fml/cnaps_poc.fml32")))
             .contains("CITY", "KEYWORD");
+    }
+
+    @Test
+    void repeatedJoltFieldsHaveUnlimitedOccurrenceCountsAndCorrectDirections() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+
+        assertRepeatedParam(metadata, "DICTQRY", "DICT_TYPE", "string", "inout");
+        assertRepeatedParam(metadata, "DICTQRY", "DICT_CODE", "string", "out");
+        assertRepeatedParam(metadata, "DICTQRY", "DICT_NAME", "string", "out");
+        assertRepeatedParam(metadata, "DICTQRY", "SORT_NO", "long", "out");
+
+        assertRepeatedParam(metadata, "BANKQRY", "BANK_NO", "string", "inout");
+        assertRepeatedParam(metadata, "BANKQRY", "BANK_NAME", "string", "out");
+        assertRepeatedParam(metadata, "BANKQRY", "CITY", "string", "inout");
+        assertRepeatedParam(metadata, "BANKQRY", "SYSTEM_TYPE", "string", "inout");
+
+        for (String field : VOUCHER_RECORD_FIELDS) {
+            String type = "VERSION_NO".equals(field) ? "long" : "string";
+            String generalAccess = switch (field) {
+                case "WORK_DATE", "BRANCH_NO", "STATUS", "SERIAL_NO", "VOUCHER_NO", "PAYEE_NAME", "PAYEE_ACCT" -> "inout";
+                default -> "out";
+            };
+            String reviewAccess = switch (field) {
+                case "WORK_DATE", "BRANCH_NO", "SERIAL_NO" -> "inout";
+                default -> "out";
+            };
+            assertRepeatedParam(metadata, "CNAPS4609Q", field, type, generalAccess);
+            assertRepeatedParam(metadata, "CNAPS5702Q", field, type, reviewAccess);
+        }
+    }
+
+    @Test
+    void pageRequestAndEnvelopeMetadataRemainScalarAndErrorsUseOuterr() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+
+        assertScalarParam(metadata, "DICTQRY", "REQUEST_ID", "string", "inout");
+        assertScalarParam(metadata, "BANKQRY", "KEYWORD", "string", "in");
+        assertScalarParam(metadata, "BANKQRY", "PAGE_NO", "long", "inout");
+        assertScalarParam(metadata, "BANKQRY", "PAGE_SIZE", "long", "inout");
+        assertScalarParam(metadata, "BANKQRY", "TOTAL_ELEMENTS", "long", "out");
+        assertScalarParam(metadata, "CNAPS4609Q", "INCLUDE_DELETED", "string", "in");
+        assertScalarParam(metadata, "CNAPS4609Q", "PAGE_NO", "long", "inout");
+        assertScalarParam(metadata, "CNAPS4609Q", "PAGE_SIZE", "long", "inout");
+        assertScalarParam(metadata, "CNAPS4609Q", "TOTAL_ELEMENTS", "long", "out");
+        assertScalarParam(metadata, "CNAPS5702Q", "PAGE_NO", "long", "inout");
+        assertScalarParam(metadata, "CNAPS5702Q", "PAGE_SIZE", "long", "inout");
+        assertScalarParam(metadata, "CNAPS5702Q", "TOTAL_ELEMENTS", "long", "out");
+
+        for (String service : EXPORTED_SERVICES) {
+            assertScalarParam(metadata, service, "RESP_CODE", "string", "outerr");
+            assertScalarParam(metadata, service, "RESP_MSG", "string", "outerr");
+        }
     }
 
     @Test
@@ -188,5 +254,36 @@ class DeploymentArtifactTest {
         int start = metadata.indexOf("service=" + serviceName);
         int end = metadata.indexOf("service=", start + 1);
         return normalizeLineEndings(metadata.substring(start, end < 0 ? metadata.length() : end));
+    }
+
+    private String paramMetadata(String metadata, String serviceName, String paramName) {
+        String service = serviceMetadata(metadata, serviceName);
+        int start = service.indexOf("param=" + paramName + "\n");
+        assertThat(start).as(serviceName + " " + paramName).isGreaterThanOrEqualTo(0);
+        int end = service.indexOf("param=", start + 1);
+        return service.substring(start, end < 0 ? service.length() : end);
+    }
+
+    private void assertRepeatedParam(
+        String metadata,
+        String serviceName,
+        String paramName,
+        String type,
+        String access
+    ) {
+        assertThat(paramMetadata(metadata, serviceName, paramName))
+            .contains("type=" + type + "\n", "access=" + access + "\n", "count=0\n");
+    }
+
+    private void assertScalarParam(
+        String metadata,
+        String serviceName,
+        String paramName,
+        String type,
+        String access
+    ) {
+        assertThat(paramMetadata(metadata, serviceName, paramName))
+            .contains("type=" + type + "\n", "access=" + access + "\n")
+            .doesNotContain("count=");
     }
 }

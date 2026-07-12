@@ -166,5 +166,6 @@ void CNAPS5702I(TPSVCINFO *rqst)
         return;
     }
     cnaps_put_voucher(fbfr, &row);
+    cnaps_put_voucher_detail_fields(fbfr, &row);
     cnaps_return_response(rqst, 1, "0000", "detail query success");
 }

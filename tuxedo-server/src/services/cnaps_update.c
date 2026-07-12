@@ -147,8 +147,11 @@ void CNAPS5701U(TPSVCINFO *rqst)
     overlay_field(fbfr, CNAPS_F_ACCOUNT_PART3, row.account_part3, sizeof(row.account_part3));
     overlay_field(fbfr, CNAPS_F_ACCOUNT_NAME, row.account_name, sizeof(row.account_name));
     overlay_field(fbfr, CNAPS_F_PAYER_NAME, row.payer_name, sizeof(row.payer_name));
+    overlay_field(fbfr, CNAPS_F_PAYER_ADDRESS, row.payer_address, sizeof(row.payer_address));
+    overlay_field(fbfr, CNAPS_F_PAYER_BANK_NAME, row.payer_bank_name, sizeof(row.payer_bank_name));
     overlay_field(fbfr, CNAPS_F_PAYEE_ACCT, row.payee_account_no, sizeof(row.payee_account_no));
     overlay_field(fbfr, CNAPS_F_PAYEE_NAME, row.payee_name, sizeof(row.payee_name));
+    overlay_field(fbfr, CNAPS_F_PAYEE_ADDRESS, row.payee_address, sizeof(row.payee_address));
     priority_supplied = overlay_field(fbfr, CNAPS_F_PRIORITY, row.priority, sizeof(row.priority));
     overlay_field(fbfr, CNAPS_F_RECEIVE_BANK_NO, row.receive_bank_no, sizeof(row.receive_bank_no));
     overlay_field(fbfr, CNAPS_F_RECEIVE_BANK_NAME, row.receive_bank_name, sizeof(row.receive_bank_name));
@@ -172,6 +175,12 @@ void CNAPS5701U(TPSVCINFO *rqst)
     if ((amount_supplied && !valid_money(row.amount, 0))
         || (fee_amount_supplied && !valid_money(row.fee_amount, 1))) {
         cnaps_return_error(rqst, "2002", "invalid money");
+        return;
+    }
+    if (!cnaps_valid_optional_text(row.payer_address, 256)
+        || !cnaps_valid_optional_text(row.payee_address, 256)
+        || !cnaps_valid_optional_text(row.payer_bank_name, 128)) {
+        cnaps_return_error(rqst, "2002", "field too long");
         return;
     }
     if (invalid_dictionary_fields(

@@ -42,3 +42,20 @@ int cnaps_valid_work_date(const char *value)
     }
     return day >= 1 && day <= max_day;
 }
+
+int cnaps_valid_optional_text(const char *value, size_t max_characters)
+{
+    size_t characters = 0;
+    const unsigned char *cursor = (const unsigned char *)value;
+
+    if (value == NULL) {
+        return 1;
+    }
+    while (*cursor != '\0') {
+        if ((*cursor & 0xC0U) != 0x80U && ++characters > max_characters) {
+            return 0;
+        }
+        ++cursor;
+    }
+    return 1;
+}

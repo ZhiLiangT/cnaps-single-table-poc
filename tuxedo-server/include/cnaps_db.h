@@ -14,8 +14,11 @@ typedef struct {
     char account_part3[65];
     char account_name[129];
     char payer_name[129];
+    char payer_address[1025];
+    char payer_bank_name[513];
     char payee_account_no[65];
     char payee_name[129];
+    char payee_address[1025];
     char priority[13];
     char receive_bank_no[33];
     char receive_bank_name[129];

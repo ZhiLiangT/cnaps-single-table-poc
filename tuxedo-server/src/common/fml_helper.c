@@ -105,6 +105,17 @@ void cnaps_put_voucher(FBFR32 *fbfr, const void *value)
     cnaps_put_voucher_occurrence(fbfr, value, 0);
 }
 
+void cnaps_put_voucher_detail_fields(FBFR32 *fbfr, const void *value)
+{
+    const cnaps_voucher_row *row = (const cnaps_voucher_row *)value;
+    if (row == NULL) {
+        return;
+    }
+    cnaps_put_string(fbfr, CNAPS_F_PAYER_ADDRESS, row->payer_address);
+    cnaps_put_string(fbfr, CNAPS_F_PAYEE_ADDRESS, row->payee_address);
+    cnaps_put_string(fbfr, CNAPS_F_PAYER_BANK_NAME, row->payer_bank_name);
+}
+
 void cnaps_put_voucher_occurrence(FBFR32 *fbfr, const void *value, FLDOCC32 occurrence)
 {
     const cnaps_voucher_row *row = (const cnaps_voucher_row *)value;

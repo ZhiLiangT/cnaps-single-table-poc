@@ -193,8 +193,11 @@ static int execute_dml(const char *sql, const cnaps_voucher_row *row, int requir
     BIND(":account_part3", row->account_part3);
     BIND(":account_name", row->account_name);
     BIND(":payer_name", row->payer_name);
+    BIND(":payer_address", row->payer_address);
+    BIND(":payer_bank_name", row->payer_bank_name);
     BIND(":payee_account_no", row->payee_account_no);
     BIND(":payee_name", row->payee_name);
+    BIND(":payee_address", row->payee_address);
     BIND(":priority", row->priority);
     BIND(":receive_bank_no", row->receive_bank_no);
     BIND(":receive_bank_name", row->receive_bank_name);
@@ -275,14 +278,14 @@ int db_insert_voucher(const cnaps_voucher_row *row)
     static const char *sql =
         "INSERT INTO T_CNAPS_BILL_POC ("
         "BILL_ID, WORK_DATE, BRANCH_NO, OPERATOR_NO, SERIAL_NO, BUSINESS_TYPE, "
-        "ACCOUNT_PART1, ACCOUNT_PART2, ACCOUNT_PART3, ACCOUNT_NAME, PAYER_NAME, "
-        "PAYEE_ACCOUNT_NO, PAYEE_NAME, PRIORITY, RECEIVE_BANK_NO, RECEIVE_BANK_NAME, SYSTEM_TYPE, "
+        "ACCOUNT_PART1, ACCOUNT_PART2, ACCOUNT_PART3, ACCOUNT_NAME, PAYER_NAME, PAYER_ADDRESS, PAYER_BANK_NAME, "
+        "PAYEE_ACCOUNT_NO, PAYEE_NAME, PAYEE_ADDRESS, PRIORITY, RECEIVE_BANK_NO, RECEIVE_BANK_NAME, SYSTEM_TYPE, "
         "AMOUNT, DEBIT_MODE, FEE_AMOUNT, FEE_CHARGE_MODE, SEND_MODE, FAX_FLAG, VOUCHER_NO, REMARK, "
         "STATUS, LAST_ACTION, LAST_OPERATOR_NO, LAST_REQUEST_ID, LAST_ACTION_TIME, CREATED_AT, UPDATED_AT, VERSION_NO"
         ") VALUES ("
         ":bill_id, TO_DATE(:work_date, 'YYYY-MM-DD'), :branch_no, :operator_no, :serial_no, :business_type, "
-        ":account_part1, :account_part2, :account_part3, :account_name, :payer_name, "
-        ":payee_account_no, :payee_name, :priority, :receive_bank_no, :receive_bank_name, :system_type, "
+        ":account_part1, :account_part2, :account_part3, :account_name, :payer_name, :payer_address, :payer_bank_name, "
+        ":payee_account_no, :payee_name, :payee_address, :priority, :receive_bank_no, :receive_bank_name, :system_type, "
         "TO_NUMBER(:amount), :debit_mode, TO_NUMBER(NVL(:fee_amount, '0')), :fee_charge_mode, :send_mode, :fax_flag, "
         ":voucher_no, :remark, :status, :last_action, :last_operator_no, :last_request_id, SYSTIMESTAMP, SYSTIMESTAMP, SYSTIMESTAMP, 1"
         ")";
@@ -297,7 +300,8 @@ int db_update_voucher(const cnaps_voucher_row *row)
         "WORK_DATE=COALESCE(TO_DATE(:work_date, 'YYYY-MM-DD'), WORK_DATE), "
         "BUSINESS_TYPE=:business_type, ACCOUNT_PART1=:account_part1, ACCOUNT_PART2=:account_part2, "
         "ACCOUNT_PART3=:account_part3, ACCOUNT_NAME=:account_name, PAYER_NAME=:payer_name, "
-        "PAYEE_ACCOUNT_NO=:payee_account_no, PAYEE_NAME=:payee_name, PRIORITY=:priority, "
+        "PAYER_ADDRESS=:payer_address, PAYER_BANK_NAME=:payer_bank_name, "
+        "PAYEE_ACCOUNT_NO=:payee_account_no, PAYEE_NAME=:payee_name, PAYEE_ADDRESS=:payee_address, PRIORITY=:priority, "
         "RECEIVE_BANK_NO=:receive_bank_no, RECEIVE_BANK_NAME=:receive_bank_name, SYSTEM_TYPE=:system_type, "
         "AMOUNT=TO_NUMBER(:amount), DEBIT_MODE=:debit_mode, FEE_AMOUNT=TO_NUMBER(NVL(:fee_amount, '0')), "
         "FEE_CHARGE_MODE=:fee_charge_mode, SEND_MODE=:send_mode, FAX_FLAG=:fax_flag, "
@@ -330,7 +334,8 @@ static int define_long(OCIStmt *stmt, int position, long *value, sb2 *indicator)
 #define CNAPS_VOUCHER_SELECT_COLUMNS \
     "BILL_ID, TO_CHAR(WORK_DATE, 'YYYY-MM-DD'), BRANCH_NO, OPERATOR_NO, SERIAL_NO, " \
     "BUSINESS_TYPE, ACCOUNT_PART1, ACCOUNT_PART2, ACCOUNT_PART3, " \
-    "NVL(ACCOUNT_NAME, ''), NVL(PAYER_NAME, ''), PAYEE_ACCOUNT_NO, PAYEE_NAME, " \
+    "NVL(ACCOUNT_NAME, ''), NVL(PAYER_NAME, ''), NVL(PAYER_ADDRESS, ''), NVL(PAYER_BANK_NAME, ''), " \
+    "PAYEE_ACCOUNT_NO, PAYEE_NAME, NVL(PAYEE_ADDRESS, ''), " \
     "NVL(PRIORITY, ''), NVL(RECEIVE_BANK_NO, ''), NVL(RECEIVE_BANK_NAME, ''), " \
     "NVL(SYSTEM_TYPE, ''), TO_CHAR(AMOUNT, 'FM9999999999999990D00'), " \
     "NVL(DEBIT_MODE, ''), TO_CHAR(NVL(FEE_AMOUNT, 0), 'FM9999999999999990D00'), " \
@@ -354,7 +359,7 @@ static int define_long(OCIStmt *stmt, int position, long *value, sb2 *indicator)
     "AND (:payee_account_no IS NULL OR PAYEE_ACCOUNT_NO=:payee_account_no) " \
     "AND (:include_deleted=1 OR STATUS<>'40_DELETED') "
 
-static int define_voucher_row(OCIStmt *stmt, cnaps_voucher_row *row, sb2 indicators[40])
+static int define_voucher_row(OCIStmt *stmt, cnaps_voucher_row *row, sb2 indicators[43])
 {
 #define DEFINE_TEXT(POSITION, MEMBER) do { \
     if (define_text(stmt, POSITION, row->MEMBER, sizeof(row->MEMBER), &indicators[(POSITION) - 1]) != 0) return -1; \
@@ -370,44 +375,48 @@ static int define_voucher_row(OCIStmt *stmt, cnaps_voucher_row *row, sb2 indicat
     DEFINE_TEXT(9, account_part3);
     DEFINE_TEXT(10, account_name);
     DEFINE_TEXT(11, payer_name);
-    DEFINE_TEXT(12, payee_account_no);
-    DEFINE_TEXT(13, payee_name);
-    DEFINE_TEXT(14, priority);
-    DEFINE_TEXT(15, receive_bank_no);
-    DEFINE_TEXT(16, receive_bank_name);
-    DEFINE_TEXT(17, system_type);
-    DEFINE_TEXT(18, amount);
-    DEFINE_TEXT(19, debit_mode);
-    DEFINE_TEXT(20, fee_amount);
-    DEFINE_TEXT(21, fee_charge_mode);
-    DEFINE_TEXT(22, send_mode);
-    DEFINE_TEXT(23, fax_flag);
-    DEFINE_TEXT(24, voucher_no);
-    DEFINE_TEXT(25, remark);
-    DEFINE_TEXT(26, status);
-    DEFINE_TEXT(27, checker_no);
-    DEFINE_TEXT(28, checker_time);
-    DEFINE_TEXT(29, review_comment);
-    DEFINE_TEXT(30, reject_reason);
-    DEFINE_TEXT(31, delete_reason);
-    DEFINE_TEXT(32, delete_operator_no);
-    DEFINE_TEXT(33, delete_time);
-    DEFINE_TEXT(34, last_action);
-    DEFINE_TEXT(35, last_operator_no);
-    DEFINE_TEXT(36, last_request_id);
-    DEFINE_TEXT(37, last_action_time);
-    DEFINE_TEXT(38, created_at);
-    DEFINE_TEXT(39, updated_at);
+    DEFINE_TEXT(12, payer_address);
+    DEFINE_TEXT(13, payer_bank_name);
+    DEFINE_TEXT(14, payee_account_no);
+    DEFINE_TEXT(15, payee_name);
+    DEFINE_TEXT(16, payee_address);
+    DEFINE_TEXT(17, priority);
+    DEFINE_TEXT(18, receive_bank_no);
+    DEFINE_TEXT(19, receive_bank_name);
+    DEFINE_TEXT(20, system_type);
+    DEFINE_TEXT(21, amount);
+    DEFINE_TEXT(22, debit_mode);
+    DEFINE_TEXT(23, fee_amount);
+    DEFINE_TEXT(24, fee_charge_mode);
+    DEFINE_TEXT(25, send_mode);
+    DEFINE_TEXT(26, fax_flag);
+    DEFINE_TEXT(27, voucher_no);
+    DEFINE_TEXT(28, remark);
+    DEFINE_TEXT(29, status);
+    DEFINE_TEXT(30, checker_no);
+    DEFINE_TEXT(31, checker_time);
+    DEFINE_TEXT(32, review_comment);
+    DEFINE_TEXT(33, reject_reason);
+    DEFINE_TEXT(34, delete_reason);
+    DEFINE_TEXT(35, delete_operator_no);
+    DEFINE_TEXT(36, delete_time);
+    DEFINE_TEXT(37, last_action);
+    DEFINE_TEXT(38, last_operator_no);
+    DEFINE_TEXT(39, last_request_id);
+    DEFINE_TEXT(40, last_action_time);
+    DEFINE_TEXT(41, created_at);
+    DEFINE_TEXT(42, updated_at);
 #undef DEFINE_TEXT
-    return define_long(stmt, 40, &row->version_no, &indicators[39]);
+    return define_long(stmt, 43, &row->version_no, &indicators[42]);
 }
 
-static void clear_voucher_nulls(cnaps_voucher_row *row, const sb2 indicators[40])
+static void clear_voucher_nulls(cnaps_voucher_row *row, const sb2 indicators[43])
 {
-    char *fields[39] = {
+    char *fields[42] = {
         row->bill_id, row->work_date, row->branch_no, row->operator_no, row->serial_no,
         row->business_type, row->account_part1, row->account_part2, row->account_part3,
-        row->account_name, row->payer_name, row->payee_account_no, row->payee_name,
+        row->account_name, row->payer_name, row->payer_address, row->payer_bank_name,
+        row->payee_account_no, row->payee_name, row->payee_address,
         row->priority, row->receive_bank_no, row->receive_bank_name, row->system_type,
         row->amount, row->debit_mode, row->fee_amount, row->fee_charge_mode, row->send_mode,
         row->fax_flag, row->voucher_no, row->remark, row->status, row->checker_no,
@@ -421,7 +430,7 @@ static void clear_voucher_nulls(cnaps_voucher_row *row, const sb2 indicators[40]
             fields[i][0] = '\0';
         }
     }
-    if (indicators[39] == -1) {
+    if (indicators[42] == -1) {
         row->version_no = 1;
     }
 }
@@ -433,7 +442,7 @@ int db_find_voucher(const char *bill_id, cnaps_voucher_row *row)
         "FROM T_CNAPS_BILL_POC WHERE BILL_ID=:bill_id";
     OCIStmt *stmt = NULL;
     sword status;
-    sb2 indicators[40] = {0};
+    sb2 indicators[43] = {0};
 
     memset(row, 0, sizeof(*row));
     if (prepare_stmt(sql, &stmt) != 0) {
@@ -486,7 +495,7 @@ int db_query_vouchers(
         "OFFSET :offset_rows ROWS FETCH NEXT :page_size ROWS ONLY";
     OCIStmt *stmt = NULL;
     cnaps_voucher_row fetched = {0};
-    sb2 indicators[40] = {0};
+    sb2 indicators[43] = {0};
     sword fetch_status;
     long total_value = 0;
     long include_deleted_value = include_deleted ? 1 : 0;

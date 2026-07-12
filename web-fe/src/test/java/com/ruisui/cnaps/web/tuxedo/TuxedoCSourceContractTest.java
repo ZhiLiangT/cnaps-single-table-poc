@@ -100,6 +100,42 @@ class TuxedoCSourceContractTest {
     }
 
     @Test
+    void nativeCreateUpdateAndDetailPersistPartyAddressFieldsWithoutAddingListOutput() throws Exception {
+        String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_db.h"));
+        String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
+        String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
+        String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+        String fml = Files.readString(root.resolve("tuxedo-server/src/common/fml_helper.c"));
+
+        assertThat(header).contains(
+            "char payer_address[1025]", "char payee_address[1025]", "char payer_bank_name[513]"
+        );
+        assertThat(create).contains(
+            "CNAPS_F_PAYER_ADDRESS", "CNAPS_F_PAYEE_ADDRESS", "CNAPS_F_PAYER_BANK_NAME",
+            "cnaps_valid_optional_text"
+        );
+        assertThat(update).contains(
+            "overlay_field(fbfr, CNAPS_F_PAYER_ADDRESS",
+            "overlay_field(fbfr, CNAPS_F_PAYEE_ADDRESS",
+            "overlay_field(fbfr, CNAPS_F_PAYER_BANK_NAME",
+            "cnaps_valid_optional_text"
+        );
+        assertThat(db).contains(
+            "PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME",
+            ":payer_address", ":payee_address", ":payer_bank_name"
+        );
+        assertThat(query).contains("cnaps_put_voucher_detail_fields(fbfr, &row)");
+        assertThat(fml)
+            .contains("void cnaps_put_voucher_detail_fields")
+            .doesNotContain(
+                "PUT_STRING(CNAPS_F_PAYER_ADDRESS",
+                "PUT_STRING(CNAPS_F_PAYEE_ADDRESS",
+                "PUT_STRING(CNAPS_F_PAYER_BANK_NAME"
+            );
+    }
+
+    @Test
     void nativeCreateKeepsTheFindKeySeparateFromTheHydratedRow() throws Exception {
         String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
 

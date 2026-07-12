@@ -204,6 +204,31 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void schemaAndInitScriptProvideRepeatablePartyAddressMigration() throws Exception {
+        String createTable = Files.readString(root.resolve("sql/010_create_tables.sql"));
+        String schema = Files.readString(root.resolve("sql/schema.sql"));
+        Path migrationPath = root.resolve("sql/040_add_party_address_bank_fields.sql");
+        String initDb = Files.readString(root.resolve("scripts/init-db.sh"));
+
+        assertThat(createTable).contains(
+            "PAYER_ADDRESS VARCHAR2(256 CHAR)",
+            "PAYEE_ADDRESS VARCHAR2(256 CHAR)",
+            "PAYER_BANK_NAME VARCHAR2(128 CHAR)"
+        );
+        assertThat(schema).contains(
+            "PAYER_ADDRESS VARCHAR2(256 CHAR)",
+            "PAYEE_ADDRESS VARCHAR2(256 CHAR)",
+            "PAYER_BANK_NAME VARCHAR2(128 CHAR)"
+        );
+        assertThat(migrationPath).exists();
+        String migration = Files.readString(migrationPath);
+        assertThat(countOccurrences(migration, "USER_TAB_COLUMNS")).isEqualTo(3);
+        assertThat(countOccurrences(migration, "ALTER TABLE T_CNAPS_BILL_POC ADD")).isEqualTo(3);
+        assertThat(migration).contains("PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME");
+        assertThat(initDb).contains("040_add_party_address_bank_fields.sql");
+    }
+
+    @Test
     void tuxedo22cLocalJoltConfigurationAllowsNonTlsLoopbackForPoc() throws Exception {
         String tuxedoEnv = Files.readString(root.resolve("conf/tuxedo.env"));
         String tomcatConfig = Files.readString(root.resolve("scripts/configure-tomcat.sh"));

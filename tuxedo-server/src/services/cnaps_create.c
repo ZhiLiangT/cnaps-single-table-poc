@@ -116,8 +116,11 @@ static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row, const 
     copy_text(fbfr, CNAPS_F_ACCOUNT_PART3, row->account_part3, sizeof(row->account_part3), "");
     copy_text(fbfr, CNAPS_F_ACCOUNT_NAME, row->account_name, sizeof(row->account_name), "");
     copy_text(fbfr, CNAPS_F_PAYER_NAME, row->payer_name, sizeof(row->payer_name), "");
+    copy_text(fbfr, CNAPS_F_PAYER_ADDRESS, row->payer_address, sizeof(row->payer_address), "");
+    copy_text(fbfr, CNAPS_F_PAYER_BANK_NAME, row->payer_bank_name, sizeof(row->payer_bank_name), "");
     copy_text(fbfr, CNAPS_F_PAYEE_ACCT, row->payee_account_no, sizeof(row->payee_account_no), "");
     copy_text(fbfr, CNAPS_F_PAYEE_NAME, row->payee_name, sizeof(row->payee_name), "");
+    copy_text(fbfr, CNAPS_F_PAYEE_ADDRESS, row->payee_address, sizeof(row->payee_address), "");
     copy_text(fbfr, CNAPS_F_PRIORITY, row->priority, sizeof(row->priority), "");
     copy_text(fbfr, CNAPS_F_RECEIVE_BANK_NO, row->receive_bank_no, sizeof(row->receive_bank_no), "");
     copy_text(fbfr, CNAPS_F_RECEIVE_BANK_NAME, row->receive_bank_name, sizeof(row->receive_bank_name), "");
@@ -172,6 +175,12 @@ void CNAPS5701E(TPSVCINFO *rqst)
     }
     if (!valid_money(row.amount, 0) || !valid_money(row.fee_amount, 1)) {
         cnaps_return_error(rqst, "2002", "invalid money");
+        return;
+    }
+    if (!cnaps_valid_optional_text(row.payer_address, 256)
+        || !cnaps_valid_optional_text(row.payee_address, 256)
+        || !cnaps_valid_optional_text(row.payer_bank_name, 128)) {
+        cnaps_return_error(rqst, "2002", "field too long");
         return;
     }
     if (invalid_dictionary_fields(&row)) {

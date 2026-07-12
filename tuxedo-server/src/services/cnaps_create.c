@@ -26,6 +26,49 @@ static void compact_date(const char *work_date, char *out, size_t out_size)
     out[j] = '\0';
 }
 
+static int is_blank(const char *value)
+{
+    if (value == NULL) {
+        return 1;
+    }
+    while (*value != '\0') {
+        if (!isspace((unsigned char)*value)) {
+            return 0;
+        }
+        ++value;
+    }
+    return 1;
+}
+
+static int valid_work_date(const char *value)
+{
+    static const int days_by_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int year;
+    int month;
+    int day;
+    int max_day;
+
+    if (value == NULL || strlen(value) != 10 || value[4] != '-' || value[7] != '-') {
+        return 0;
+    }
+    for (int i = 0; i < 10; ++i) {
+        if (i != 4 && i != 7 && !isdigit((unsigned char)value[i])) {
+            return 0;
+        }
+    }
+    year = (value[0] - '0') * 1000 + (value[1] - '0') * 100 + (value[2] - '0') * 10 + value[3] - '0';
+    month = (value[5] - '0') * 10 + value[6] - '0';
+    day = (value[8] - '0') * 10 + value[9] - '0';
+    if (year == 0 || month < 1 || month > 12) {
+        return 0;
+    }
+    max_day = days_by_month[month - 1];
+    if (month == 2 && (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0))) {
+        max_day = 29;
+    }
+    return day >= 1 && day <= max_day;
+}
+
 static int valid_money(const char *value, int zero_allowed)
 {
     int decimal_seen = 0;
@@ -57,22 +100,20 @@ static int valid_money(const char *value, int zero_allowed)
 
 static int required_field_missing(const cnaps_voucher_row *row)
 {
-    return row->work_date[0] == '\0'
-        || row->business_type[0] == '\0'
-        || row->account_part1[0] == '\0'
-        || row->account_part2[0] == '\0'
-        || row->account_part3[0] == '\0'
-        || row->payee_account_no[0] == '\0'
-        || row->payee_name[0] == '\0'
-        || row->priority[0] == '\0'
-        || row->system_type[0] == '\0'
-        || row->amount[0] == '\0';
+    return is_blank(row->work_date)
+        || is_blank(row->business_type)
+        || is_blank(row->account_part1)
+        || is_blank(row->account_part2)
+        || is_blank(row->account_part3)
+        || is_blank(row->payee_account_no)
+        || is_blank(row->payee_name)
+        || is_blank(row->priority)
+        || is_blank(row->system_type)
+        || is_blank(row->amount);
 }
 
 static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row)
 {
-    char date_part[9] = {0};
-
     memset(row, 0, sizeof(*row));
     copy_text(fbfr, CNAPS_F_WORK_DATE, row->work_date, sizeof(row->work_date), "");
     copy_text(fbfr, CNAPS_F_BRANCH_NO, row->branch_no, sizeof(row->branch_no), "772");
@@ -102,6 +143,11 @@ static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row)
     snprintf(row->last_action, sizeof(row->last_action), "%s", "CREATE");
     snprintf(row->last_operator_no, sizeof(row->last_operator_no), "%s", row->operator_no);
     row->version_no = 1;
+}
+
+static void generate_identifiers(cnaps_voucher_row *row)
+{
+    char date_part[9] = {0};
 
     if (db_next_serial_no(row->work_date, row->branch_no, row->serial_no, sizeof(row->serial_no)) != 0) {
         snprintf(row->serial_no, sizeof(row->serial_no), "%s", "0002000");
@@ -118,15 +164,20 @@ void CNAPS5701E(TPSVCINFO *rqst)
 
     cnaps_log_service_start("CNAPS5701E");
     row_from_create_request(fbfr, &row);
-    snprintf(bill_id, sizeof(bill_id), "%s", row.bill_id);
     if (row.work_date[0] == '\0' || required_field_missing(&row)) {
         cnaps_return_error(rqst, "2001", "required field missing");
+        return;
+    }
+    if (!valid_work_date(row.work_date)) {
+        cnaps_return_error(rqst, "2002", "invalid work date");
         return;
     }
     if (!valid_money(row.amount, 0) || !valid_money(row.fee_amount, 1)) {
         cnaps_return_error(rqst, "2002", "invalid money");
         return;
     }
+    generate_identifiers(&row);
+    snprintf(bill_id, sizeof(bill_id), "%s", row.bill_id);
     if (db_begin() != 0
         || db_insert_voucher(&row) != 0
         || db_find_voucher(bill_id, &row) != 0

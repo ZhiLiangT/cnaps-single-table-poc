@@ -52,6 +52,35 @@ static int valid_money(const char *value, int zero_allowed)
     return zero_allowed || nonzero_seen;
 }
 
+static int valid_work_date(const char *value)
+{
+    static const int days_by_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int year;
+    int month;
+    int day;
+    int max_day;
+
+    if (value == NULL || strlen(value) != 10 || value[4] != '-' || value[7] != '-') {
+        return 0;
+    }
+    for (int i = 0; i < 10; ++i) {
+        if (i != 4 && i != 7 && !isdigit((unsigned char)value[i])) {
+            return 0;
+        }
+    }
+    year = (value[0] - '0') * 1000 + (value[1] - '0') * 100 + (value[2] - '0') * 10 + value[3] - '0';
+    month = (value[5] - '0') * 10 + value[6] - '0';
+    day = (value[8] - '0') * 10 + value[9] - '0';
+    if (year == 0 || month < 1 || month > 12) {
+        return 0;
+    }
+    max_day = days_by_month[month - 1];
+    if (month == 2 && (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0))) {
+        max_day = 29;
+    }
+    return day >= 1 && day <= max_day;
+}
+
 void CNAPS5701U(TPSVCINFO *rqst)
 {
     FBFR32 *fbfr = (FBFR32 *)rqst->data;
@@ -59,6 +88,7 @@ void CNAPS5701U(TPSVCINFO *rqst)
     char bill_id[33] = {0};
     char operator_no[17] = {0};
     char request_id[33] = {0};
+    int work_date_supplied;
     int amount_supplied;
     int fee_amount_supplied;
     int rc;
@@ -85,7 +115,7 @@ void CNAPS5701U(TPSVCINFO *rqst)
         return;
     }
 
-    overlay_field(fbfr, CNAPS_F_WORK_DATE, row.work_date, sizeof(row.work_date));
+    work_date_supplied = overlay_field(fbfr, CNAPS_F_WORK_DATE, row.work_date, sizeof(row.work_date));
     overlay_field(fbfr, CNAPS_F_BUSINESS_TYPE, row.business_type, sizeof(row.business_type));
     overlay_field(fbfr, CNAPS_F_ACCOUNT_PART1, row.account_part1, sizeof(row.account_part1));
     overlay_field(fbfr, CNAPS_F_ACCOUNT_PART2, row.account_part2, sizeof(row.account_part2));
@@ -107,6 +137,10 @@ void CNAPS5701U(TPSVCINFO *rqst)
     overlay_field(fbfr, CNAPS_F_VOUCHER_NO, row.voucher_no, sizeof(row.voucher_no));
     overlay_field(fbfr, CNAPS_F_REMARK, row.remark, sizeof(row.remark));
 
+    if (work_date_supplied && !valid_work_date(row.work_date)) {
+        cnaps_return_error(rqst, "2002", "invalid work date");
+        return;
+    }
     if ((amount_supplied && !valid_money(row.amount, 0))
         || (fee_amount_supplied && !valid_money(row.fee_amount, 1))) {
         cnaps_return_error(rqst, "2002", "invalid money");

@@ -104,4 +104,30 @@ class TuxedoCSourceContractTest {
             .contains("char bill_id[33]", "db_find_voucher(bill_id, &row)")
             .doesNotContain("db_find_voucher(row.bill_id, &row)");
     }
+
+    @Test
+    void nativeCreateAndUpdateValidateBlankFieldsAndWorkDate() throws Exception {
+        String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
+        String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
+
+        assertThat(create).contains(
+            "is_blank(row->work_date)", "is_blank(row->account_part1)",
+            "is_blank(row->payee_account_no)", "valid_work_date(row.work_date)", "2002"
+        );
+        assertThat(update).contains(
+            "work_date_supplied", "valid_work_date(row.work_date)", "2002"
+        );
+    }
+
+    @Test
+    void nativeDetailFormatsDatabaseScaleAmountsWithoutLosingAnIntegerDigit() throws Exception {
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+
+        assertThat(db)
+            .contains(
+                "TO_CHAR(AMOUNT, 'FM9999999999999990D00')",
+                "TO_CHAR(NVL(FEE_AMOUNT, 0), 'FM9999999999999990D00')"
+            )
+            .doesNotContain("FM999999999999990D00");
+    }
 }

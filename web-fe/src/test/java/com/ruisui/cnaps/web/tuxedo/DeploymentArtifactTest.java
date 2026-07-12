@@ -220,6 +220,32 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void frontendApiDocumentsTheApprovedHeaderlessV03Contract() throws Exception {
+        String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
+
+        assertThat(api).contains(
+            "`respCode`",
+            "`respMsg`",
+            "`data`",
+            "创建时必填",
+            "修改时可选",
+            "`pageNo`",
+            "`pageSize`",
+            "不校验复核人与录入人是否相同"
+        ).doesNotContain(
+            "| `success`",
+            "| `page` |",
+            "| `size` |",
+            "不能复核本人录入单据",
+            "`3005`",
+            "-H \"requestId:",
+            "-H \"operatorNo:",
+            "-H \"branchNo:",
+            "-H \"workDate:"
+        );
+    }
+
+    @Test
     void createPageSubmitsWorkDateWithoutBusinessHeaders() throws Exception {
         String page = Files.readString(root.resolve("web-fe/src/main/webapp/cnaps-create.jsp"));
         String script = Files.readString(root.resolve("web-fe/src/main/webapp/static/js/cnaps.js"));

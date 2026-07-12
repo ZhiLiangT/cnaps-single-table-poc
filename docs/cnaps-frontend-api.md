@@ -1,209 +1,107 @@
-# CNAPS POC 前端 HTTP API 文档
+# CNAPS 单表 POC HTTP API 文档
 
-版本日期：2026-07-10
+版本：v0.3
+版本日期：2026-07-12
 
-适用范围：当前 `cnaps-single-table-poc` WebFE/Tomcat WAR，通过 Jolt 调用 Tuxedo C 服务，再访问本机 Oracle XE。
+本文档是 `cnaps-single-table-poc` 当前唯一的公共 HTTP API 契约。WebFE/Tomcat WAR 通过 Jolt 调用 Tuxedo 服务，Tuxedo 服务访问 Oracle 单表 `T_CNAPS_BILL_POC`。
 
-## 1. 基础信息
+## 1. 基础约定
 
 ### 1.1 Base URL
 
-VM 联调地址：
-
 ```text
-http://192.168.84.134:8080/ruisui-bank-sim
-```
-
-本机或 VM 内部地址：
-
-```text
-http://127.0.0.1:8080/ruisui-bank-sim
+http://localhost:8080/ruisui-bank-sim
 ```
 
 ### 1.2 Content-Type
 
-有请求体的接口统一使用：
+所有带 JSON Body 的请求必须使用：
 
 ```http
-Content-Type: application/json
+Content-Type: application/json; charset=UTF-8
 ```
 
-如果请求体不是 `application/json`，当前 WebFE 会按空请求体处理。
+### 1.3 请求上下文与工作日期
 
-### 1.3 浏览器跨域
+公共 API 不接收业务请求头。客户端不传请求流水、操作员、机构或工作日期请求头。
 
-当前 WAR 未配置 CORS。前端如果不是同源部署，需要使用开发代理，或后续在 WebFE 增加 CORS Filter。
+- WebFE 为每次调用生成内部请求流水。
+- 固定 POC 操作员来自 `webfe.poc.operatorNo` 或 `POC_OPERATOR_NO`，默认 `77210021`。
+- 固定 POC 机构来自 `webfe.poc.branchNo` 或 `POC_BRANCH_NO`，默认 `772`。
+- 这些服务器端值只用于兼容 FML32 和单表审计字段，不代表登录身份或权限，Body、Query 和 Header 均不能覆盖。
+- `workDate` 是公开业务字段：创建时必填；修改时可选；通用查询和待复核查询中为可选 Query 参数。
 
-### 1.4 服务器请求上下文
+创建和修改的日期格式为 `yyyy-MM-dd`。查询中的工作日期过滤；未传时默认当前日期。单据详情、删除、复核通过和复核退回只需要 Path 中的 `billId`，不要求工作日期。
 
-业务请求上下文由 WebFE 在服务器端提供，不接受浏览器通过公共请求头覆盖：
+### 1.4 通用响应包络
 
-- `requestId`：WebFE 为每次请求生成 `REQ-<timestamp>` 形式的内部请求流水号，当前响应不回传该字段。
-- `operatorNo`：使用系统属性或应用配置 `webfe.poc.operatorNo`、环境变量 `POC_OPERATOR_NO`、Servlet Context 参数 `poc.operatorNo`，默认值为 `77210021`。
-- `branchNo`：使用系统属性或应用配置 `webfe.poc.branchNo`、环境变量 `POC_BRANCH_NO`、Servlet Context 参数 `poc.branchNo`，默认值为 `772`。
-
-WebFE 会向 Tuxedo 转发内部字段 `REQUEST_ID`、`OPERATOR_NO` 和 `BRANCH_NO`，用于请求跟踪、凭证创建和审计持久化。
-
-### 1.5 公共响应结构
+所有响应的顶层只包含 `respCode`、`respMsg` 和 `data`：
 
 ```json
 {
   "respCode": "0000",
-  "respMsg": "create success",
+  "respMsg": "操作已成功",
   "data": {}
 }
 ```
 
 | 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `respCode` | string | 业务响应码。成功为 `0000`。 |
-| `respMsg` | string | 业务响应消息。 |
-| `data` | object / null | 业务数据。失败时为 `null`。 |
+|---|---|---|
+| `respCode` | string | 业务响应码，`0000` 表示成功 |
+| `respMsg` | string | 响应说明 |
+| `data` | object / array / null | 业务数据；失败时为 `null` |
 
-### 1.6 响应码和 HTTP 状态
+### 1.5 分页约定
 
-| respCode | HTTP 状态 | 说明 | 当前实现备注 |
-| --- | --- | --- | --- |
-| `0000` | 200 | 成功 | 健康检查中 Oracle 为 `DOWN` 时仍可能返回 `0000`，前端需读取 `data.oracle`。 |
-| `2001` | 400 | 必填字段为空 | 已用于创建、详情、复核退回等必填校验。 |
-| `2002` | 400 | 字段格式错误 | 预留。当前多数格式错误会落到 `4001`。 |
-| `2003` | 400 | 字典值非法 | 预留。 |
-| `3001` | 404 | 记录不存在 | 已用于详情查询找不到凭证。 |
-| `3002` | 409 | 状态不允许 | 预留。 |
-| `3003` | 409 | 状态冲突 | 预留。 |
-| `3004` | 409 | 复核状态冲突 | 预留。 |
-| `3005` | 403 | 权限/复核人限制 | 预留。 |
-| `4001` | 500 | 数据库错误 | Oracle/SQL/OCI 失败。 |
-| `4002` | 504 | Tuxedo/Jolt 调用失败 | 停 Tuxedo、调用异常、超时类错误。 |
-| `4003` | 503 | Tuxedo/Jolt 不可用 | Jolt 类缺失或 ATMI 客户端不可用。 |
-| `9999` | 500 | 未知错误 | 预留。 |
+公开分页请求和响应只使用 `pageNo`、`pageSize`、`total` 和 `records`。
 
-## 2. 枚举
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---:|---:|---|
+| `pageNo` | number | `1` | 页码，从 1 开始 |
+| `pageSize` | number | `10` | 每页条数 |
+| `total` | number | - | 总记录数 |
+| `records` | array | - | 当前页记录 |
 
-### 2.1 凭证状态
+## 2. 接口清单
 
-| 值 | 说明 |
-| --- | --- |
-| `00_DRAFT` | 草稿，当前 HTTP API 不直接产出。 |
-| `10_PENDING_REVIEW` | 待复核。创建、修改后进入该状态。 |
-| `20_REVIEW_APPROVED` | 复核通过。 |
-| `30_REVIEW_REJECTED` | 复核退回。 |
-| `40_DELETED` | 已删除。 |
+| HTTP API | Tuxedo 服务 | 说明 |
+|---|---|---|
+| `GET /api/health` | `SYSHEALTH` | 健康检查 |
+| `GET /api/dicts/{dictType}` | `DICTQRY` | 字典查询 |
+| `GET /api/banks` | `BANKQRY` | 行号查询 |
+| `POST /api/cnaps/vouchers` | `CNAPS5701E` | 单据录入 |
+| `PUT /api/cnaps/vouchers/{billId}` | `CNAPS5701U` | 单据修改 |
+| `POST /api/cnaps/vouchers/{billId}/delete` | `CNAPS5701D` | 逻辑删除 |
+| `GET /api/cnaps/vouchers` | `CNAPS4609Q` | 通用查询 |
+| `GET /api/cnaps/vouchers/review-list` | `CNAPS5702Q` | 待复核查询 |
+| `GET /api/cnaps/vouchers/{billId}` | `CNAPS5702I` | 单据详情 |
+| `POST /api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` | 复核通过 |
+| `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` | 复核退回 |
 
-### 2.2 最后动作
+## 3. 状态模型
 
-| 值 | 说明 |
-| --- | --- |
-| `CREATE` | 创建。 |
-| `UPDATE` | 修改。 |
-| `DELETE` | 删除。 |
-| `REVIEW_PASS` | 复核通过。 |
-| `REVIEW_RETURN` | 复核退回。 |
+| 状态 | 说明 | 允许操作 |
+|---|---|---|
+| `10_PENDING_REVIEW` | 待复核 | 修改、删除、复核通过、复核退回 |
+| `20_REVIEW_APPROVED` | 已复核通过 | 查询 |
+| `30_REVIEW_REJECTED` | 已复核退回 | 修改、删除、查询 |
+| `40_DELETED` | 已逻辑删除 | 查询（需 `includeDeleted=true`） |
 
-### 2.3 POC 默认字典值
+创建成功进入 `10_PENDING_REVIEW`。修改仅允许原状态为 `10_PENDING_REVIEW` 或 `30_REVIEW_REJECTED`，成功后回到 `10_PENDING_REVIEW`。删除仅允许这两个状态。复核仅允许 `10_PENDING_REVIEW`。
 
-| 字段 | 值 | 说明 |
-| --- | --- | --- |
-| `businessType` | `02102` | 普通汇兑。 |
-| `priority` | `NORM` | 普通优先级。 |
-| `systemType` | `CNAPS` | CNAPS 系统。 |
-| `debitMode` | `1` | 默认扣款模式。 |
-| `feeChargeMode` | `1` | 默认收费方式。 |
-| `sendMode` | `0` | 默认发送方式。 |
-| `faxFlag` | `0` | 非传真。 |
+## 4. API 详情
 
-## 3. 字段说明
-
-### 3.1 凭证创建请求字段
-
-`POST /api/cnaps/vouchers` 使用以下 JSON 字段。当前后端硬校验要求 `workDate`、`payeeAccountNo`、`payeeName`、`amount` 非空；前端录入页还应按“前端建议必填”列做表单校验。
-
-| JSON 字段 | 类型 | 后端必填 | 前端建议必填 | 默认值 | 示例 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| `workDate` | string | 是 | 是 | 无 | `2026-07-09` | 工作日期，格式 `yyyy-MM-dd`；创建时必填。 |
-| `businessType` | string | 否 | 是 | `02102` | `02102` | 业务类型。 |
-| `accountPart1` | string | 否 | 是 | 空 | `404045` | 付款账号组成部分 1。 |
-| `accountPart2` | string | 否 | 是 | 空 | `00772` | 付款账号组成部分 2。 |
-| `accountPart3` | string | 否 | 是 | 空 | `000000000001` | 付款账号组成部分 3。 |
-| `accountName` | string | 否 | 否 | 空 | `Payer Account` | 付款账户户名。 |
-| `payerName` | string | 否 | 否 | 空 | `Payer Name` | 付款人名称。 |
-| `payeeAccountNo` | string | 是 | 是 | 无 | `622200000000000001` | 收款账号。 |
-| `payeeName` | string | 是 | 是 | 无 | `Payee Name` | 收款人名称。 |
-| `priority` | string | 否 | 是 | `NORM` | `NORM` | 优先级。 |
-| `receiveBankNo` | string | 否 | 否 | 空 | `102290000002` | 接收行行号。 |
-| `receiveBankName` | string | 否 | 否 | 空 | `CNAPS receiving bank` | 接收行名称。 |
-| `systemType` | string | 否 | 是 | `CNAPS` | `CNAPS` | 系统类型。 |
-| `amount` | string | 是 | 是 | 无 | `5600.00` | 金额。建议前端校验为大于 0 且最多两位小数。 |
-| `debitMode` | string | 否 | 是 | `1` | `1` | 扣款模式。 |
-| `feeAmount` | string | 否 | 否 | `0` | `0.00` | 手续费金额。 |
-| `feeChargeMode` | string | 否 | 是 | `1` | `1` | 收费方式。 |
-| `sendMode` | string | 否 | 是 | `0` | `0` | 发送方式。 |
-| `faxFlag` | string | 否 | 是 | `0` | `0` | 传真标志。 |
-| `voucherNo` | string | 否 | 否 | 空 | `PZ202607090001` | 凭证号。 |
-| `remark` | string | 否 | 否 | 空 | `front-end test` | 备注。 |
-
-### 3.2 凭证核心响应字段
-
-不同接口返回字段不完全一致。当前 Jolt 元数据和 C 服务只返回 POC 核心字段，不保证返回数据库全字段。
-
-| JSON 字段 | 类型 | 常见来源接口 | 说明 |
-| --- | --- | --- | --- |
-| `billId` | string | 创建、详情、修改、删除、复核 | 凭证编号，格式类似 `B202607097720002004`。 |
-| `serialNo` | string | 创建、详情 | 机构工作日流水号。 |
-| `workDate` | string | 创建、详情、修改 | 工作日期，格式 `yyyy-MM-dd`。 |
-| `status` | string | 创建、详情、修改、删除、复核、列表查询回显 | 凭证状态。 |
-| `businessType` | string | 创建回显 | 业务类型。 |
-| `accountPart1` | string | 创建回显 | 付款账号组成部分 1。 |
-| `accountPart2` | string | 创建回显 | 付款账号组成部分 2。 |
-| `accountPart3` | string | 创建回显 | 付款账号组成部分 3。 |
-| `accountName` | string | 创建回显 | 付款账户户名。 |
-| `payerName` | string | 创建回显 | 付款人名称。 |
-| `payeeAccountNo` | string | 创建、详情、修改 | 收款账号。 |
-| `payeeName` | string | 创建、详情、修改 | 收款人名称。 |
-| `priority` | string | 创建回显 | 优先级。 |
-| `receiveBankNo` | string | 创建回显、银行查询 | 接收行行号。 |
-| `receiveBankName` | string | 创建回显、银行查询 | 接收行名称。 |
-| `systemType` | string | 创建回显、字典查询 | 系统类型。 |
-| `amount` | string | 创建、详情、修改 | 金额。 |
-| `debitMode` | string | 创建回显 | 扣款模式。 |
-| `feeAmount` | string | 创建回显 | 手续费金额。 |
-| `feeChargeMode` | string | 创建回显 | 收费方式。 |
-| `sendMode` | string | 创建回显 | 发送方式。 |
-| `faxFlag` | string | 创建回显 | 传真标志。 |
-| `voucherNo` | string | 创建回显 | 凭证号。 |
-| `remark` | string | 创建、修改回显 | 备注。 |
-| `rejectReason` | string | 复核退回、详情有值时 | 退回原因。 |
-| `reviewComment` | string | 复核通过、详情有值时 | 复核意见。 |
-| `deleteReason` | string | 删除回显 | 删除原因。 |
-| `lastAction` | string | 部分服务扩展时返回 | 最后动作。 |
-| `totalElements` | number | 列表、复核列表 | 总条数。当前列表接口只返回计数。 |
-| `totalPages` | number | 列表、复核列表 | 总页数。当前固定返回 `1`。 |
-
-## 4. API 清单
-
-| 方法 | 路径 | Tuxedo 服务 | 说明 |
-| --- | --- | --- | --- |
-| `GET` | `/api/health` | `SYSHEALTH` | 健康检查。 |
-| `GET` | `/api/dicts/{dictType}` | `DICTQRY` | 字典查询。当前返回简化字段。 |
-| `GET` | `/api/banks` | `BANKQRY` | 银行信息查询。 |
-| `GET` | `/api/cnaps/vouchers` | `CNAPS4609Q` | 凭证列表计数查询。 |
-| `POST` | `/api/cnaps/vouchers` | `CNAPS5701E` | 创建凭证。 |
-| `GET` | `/api/cnaps/vouchers/review-list` | `CNAPS5702Q` | 待复核列表计数查询。 |
-| `GET` | `/api/cnaps/vouchers/{billId}` | `CNAPS5702I` | 凭证明细。 |
-| `PUT` | `/api/cnaps/vouchers/{billId}` | `CNAPS5701U` | 修改凭证核心字段。 |
-| `POST` | `/api/cnaps/vouchers/{billId}/delete` | `CNAPS5701D` | 删除凭证。 |
-| `POST` | `/api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` | 复核通过。 |
-| `POST` | `/api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` | 复核退回。 |
-
-## 5. 接口详情
-
-### 5.1 健康检查
+### 4.1 健康检查
 
 ```http
 GET /api/health
 ```
 
-请求参数：无。
+请求示例：
+
+```bash
+curl "http://localhost:8080/ruisui-bank-sim/api/health"
+```
 
 成功响应：
 
@@ -213,554 +111,539 @@ GET /api/health
   "respMsg": "health check success",
   "data": {
     "service": "SYSHEALTH",
-    "oracle": "UP",
+    "webfe": "UP",
     "tuxedo": "UP",
-    "webfe": "UP"
+    "oracle": "UP"
   }
 }
 ```
 
-字段说明：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `data.service` | string | Tuxedo 服务名，固定为 `SYSHEALTH`。 |
-| `data.webfe` | string | WebFE 状态，`UP`。 |
-| `data.tuxedo` | string | Tuxedo 状态，Jolt 调用成功时为 `UP`。 |
-| `data.oracle` | string | Oracle 探测结果，`UP` 或 `DOWN`。 |
-
-注意：Oracle 不可用时当前服务仍返回 HTTP 200 和 `respCode=0000`，但 `data.oracle` 会是 `DOWN`，`respMsg` 为 `Oracle unavailable`。停 Tuxedo/Jolt 时 WebFE 返回 `4002` 或 `4003`。
-
-### 5.2 字典查询
+### 4.2 字典查询
 
 ```http
 GET /api/dicts/{dictType}
 ```
 
-路径参数：
+常用 `dictType`：`BUSINESS_TYPE`、`PRIORITY`、`SYSTEM_TYPE`、`DEBIT_MODE`、`FEE_CHARGE_MODE`、`SEND_MODE`、`FAX_FLAG`。
 
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `dictType` | 是 | `BUSINESS_TYPE` | 字典类型，会映射为 Tuxedo 字段 `DICT_TYPE`。 |
+请求示例：
 
-当前成功响应：
+```bash
+curl "http://localhost:8080/ruisui-bank-sim/api/dicts/BUSINESS_TYPE"
+```
+
+成功响应：
 
 ```json
 {
   "respCode": "0000",
-  "respMsg": "query success",
-  "data": {
-    "systemType": "CNAPS"
-  }
+  "respMsg": "查询成功",
+  "data": [
+    {
+      "dictType": "BUSINESS_TYPE",
+      "dictCode": "02102",
+      "dictName": "普通汇兑",
+      "sortNo": 1
+    }
+  ]
 }
 ```
 
-当前限制：C 服务内部会写入 `DICT_TYPE`、`DICT_CODE`、`DICT_NAME`、`SORT_NO`、`SYSTEM_TYPE`，但现有 Jolt metadata 只把 `SYSTEM_TYPE` 暴露给 WebFE，所以 HTTP 响应当前只有 `systemType`。如果前端需要完整字典项，需要扩展 `tuxedo/jolt/cnaps_services.bulk`。
-
-### 5.3 银行查询
+### 4.3 行号查询
 
 ```http
 GET /api/banks
 ```
 
-查询参数：
+Query 参数：
 
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `receiveBankNo` | 否 | `102290000002` | 接收行行号。当前 POC 不按参数过滤，固定返回一条测试银行。 |
-| `pageNo` / `page` | 否 | `1` | 页码字段会传给 Tuxedo，当前 POC 不实际分页。 |
-| `pageSize` / `size` | 否 | `10` | 页大小字段会传给 Tuxedo，当前 POC 不实际分页。 |
+| 参数 | 类型 | 必输 | 示例 | 说明 |
+|---|---:|:---:|---|---|
+| `bankNo` | string | 否 | `102290000002` | 行号精确查询 |
+| `keyword` | string | 否 | `接收行` | 行名或行号关键字 |
+| `city` | string | 否 | `上海` | 城市 |
+| `systemType` | string | 否 | `CNAPS` | 系统类型 |
+| `pageNo` | number | 否 | `1` | 页码 |
+| `pageSize` | number | 否 | `10` | 每页条数 |
 
-当前成功响应：
+请求示例：
+
+```bash
+curl "http://localhost:8080/ruisui-bank-sim/api/banks?systemType=CNAPS&keyword=%E6%8E%A5%E6%94%B6%E8%A1%8C&pageNo=1&pageSize=10"
+```
+
+成功响应：
 
 ```json
 {
   "respCode": "0000",
-  "respMsg": "query success",
+  "respMsg": "查询成功",
   "data": {
-    "receiveBankNo": "102290000002",
-    "receiveBankName": "CNAPS receiving bank"
+    "pageNo": 1,
+    "pageSize": 10,
+    "total": 1,
+    "records": [
+      {
+        "bankNo": "102290000002",
+        "bankName": "CNAPS receiving bank",
+        "city": "上海",
+        "systemType": "CNAPS"
+      }
+    ]
   }
 }
 ```
 
-### 5.4 凭证列表查询
-
-```http
-GET /api/cnaps/vouchers?status=10_PENDING_REVIEW&pageNo=1&pageSize=10
-```
-
-查询参数：
-
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `workDate` | 否 | `2026-07-09` | 工作日期过滤；未传时默认当前日期。 |
-| `status` | 否 | `10_PENDING_REVIEW` | 按状态计数。 |
-| `pageNo` / `page` | 否 | `1` | 会传入 Tuxedo，但当前 C 服务不实际分页。 |
-| `pageSize` / `size` | 否 | `10` | 会传入 Tuxedo，但当前 C 服务不实际分页。 |
-| `payeeName` | 否 | `Payee` | Jolt metadata 支持传入，但当前 C 服务不使用。 |
-| `serialNo` | 否 | `0002004` | WebFE 可映射字段，但当前 C 服务不使用。 |
-| `includeDeleted` | 否 | `false` | WebFE 可映射字段，但当前 C 服务不使用。 |
-
-实际过滤条件还使用服务器配置的 `branchNo`（默认 `772`）；`status` 来自查询参数，可为空。
-
-当前成功响应：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "query success",
-  "data": {
-    "status": "10_PENDING_REVIEW",
-    "totalElements": 1,
-    "totalPages": 1
-  }
-}
-```
-
-当前限制：该接口现在只返回计数，不返回 `records`、`content` 或具体凭证明细列表。
-
-### 5.5 创建凭证
+### 4.4 单据录入
 
 ```http
 POST /api/cnaps/vouchers
-Content-Type: application/json
 ```
 
-请求体：
+核心 Body 字段：
 
-```json
-{
-  "workDate": "2026-07-09",
-  "payeeAccountNo": "622200000000000001",
-  "payeeName": "Payee Name",
-  "amount": "5600.00",
-  "businessType": "02102",
-  "priority": "NORM",
-  "systemType": "CNAPS",
-  "accountPart1": "404045",
-  "accountPart2": "00772",
-  "accountPart3": "000000000001",
-  "debitMode": "1",
-  "feeChargeMode": "1",
-  "sendMode": "0",
-  "faxFlag": "0",
-  "remark": "front-end create"
-}
-```
+| 字段 | 类型 | 必输 | 默认值 | 说明 |
+|---|---:|:---:|---|---|
+| `workDate` | string | 是 | - | 工作日期，创建时必填 |
+| `businessType` | string | 是 | `02102` | 业务种类 |
+| `accountPart1` | string | 是 | - | 付款账号一段 |
+| `accountPart2` | string | 是 | - | 付款账号二段 |
+| `accountPart3` | string | 是 | - | 付款账号三段 |
+| `payeeAccountNo` | string | 是 | - | 收款账号 |
+| `payeeName` | string | 是 | - | 收款人名称 |
+| `priority` | string | 是 | `NORM` | 优先级 |
+| `systemType` | string | 是 | `CNAPS` | 系统类型 |
+| `amount` | string | 是 | - | 大于 0，最多两位小数 |
+| `feeAmount` | string | 否 | `0.00` | 不小于 0 |
+| `debitMode` | string | 否 | `1` | 扣收方式 |
+| `feeChargeMode` | string | 否 | `1` | 手续费方式 |
+| `sendMode` | string | 否 | `0` | 发送方式 |
+| `faxFlag` | string | 否 | `0` | 传真标志 |
 
-成功行为：
+请求示例：
 
-- 生成 `billId`。
-- 生成 `serialNo`。
-- 状态置为 `10_PENDING_REVIEW`。
-- `lastAction` 在数据库中记录为 `CREATE`。
-
-当前成功响应示例：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "create success",
-  "data": {
-    "billId": "B202607097720002004",
-    "serialNo": "0002004",
-    "workDate": "2026-07-09",
-    "status": "10_PENDING_REVIEW",
-    "payeeAccountNo": "622200000000000001",
-    "payeeName": "Payee Name",
-    "amount": "5600.00",
+```bash
+curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{
+    "workDate": "2026-07-07",
     "businessType": "02102",
-    "priority": "NORM",
-    "systemType": "CNAPS",
     "accountPart1": "404045",
     "accountPart2": "00772",
     "accountPart3": "000000000001",
+    "accountName": "付款账户户名",
+    "payerName": "付款人名称",
+    "payeeAccountNo": "622200000000000001",
+    "payeeName": "收款人名称",
+    "priority": "NORM",
+    "receiveBankNo": "102290000002",
+    "receiveBankName": "接收行名称",
+    "systemType": "CNAPS",
+    "amount": "5600.00",
     "debitMode": "1",
+    "feeAmount": "0.00",
     "feeChargeMode": "1",
     "sendMode": "0",
     "faxFlag": "0",
-    "remark": "front-end create"
-  }
-}
+    "voucherNo": "PZ202607070001",
+    "remark": "验证录入"
+  }'
 ```
 
-错误场景：
-
-| 场景 | HTTP 状态 | respCode | 说明 |
-| --- | --- | --- | --- |
-| `workDate`、`payeeAccountNo`、`payeeName` 或 `amount` 为空 | 400 | `2001` | 返回 `required field missing`。 |
-| Oracle DML 失败 | 500 | `4001` | 金额格式无法转数字等也可能进入该错误。 |
-
-### 5.6 待复核列表查询
-
-```http
-GET /api/cnaps/vouchers/review-list?pageNo=1&pageSize=10
-```
-
-查询参数：
-
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `workDate` | 否 | `2026-07-09` | 工作日期过滤；未传时默认当前日期。 |
-| `pageNo` / `page` | 否 | `1` | 会传入 Tuxedo，当前 C 服务不实际分页。 |
-| `pageSize` / `size` | 否 | `10` | 会传入 Tuxedo，当前 C 服务不实际分页。 |
-
-实际过滤条件还使用服务器配置的 `branchNo`（默认 `772`），`status` 固定为 `10_PENDING_REVIEW`。
-
-当前成功响应：
+成功响应：
 
 ```json
 {
   "respCode": "0000",
-  "respMsg": "query success",
+  "respMsg": "录入成功，待复核",
   "data": {
-    "totalElements": 1,
-    "totalPages": 1
+    "billId": "B202607070000001",
+    "serialNo": "0002000",
+    "workDate": "2026-07-07",
+    "status": "10_PENDING_REVIEW",
+    "amount": "5600.00",
+    "versionNo": 1
   }
 }
 ```
 
-当前限制：该接口现在只返回计数，不返回待复核凭证列表。
+### 4.5 单据修改
 
-### 5.7 凭证明细
+```http
+PUT /api/cnaps/vouchers/{billId}
+```
+
+Body 可传创建字段；`workDate` 修改时可选，未传时保持原值。修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
+
+请求示例：
+
+```bash
+curl -X PUT "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607070000001" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{
+    "workDate": "2026-07-08",
+    "payeeAccountNo": "622200000000000001",
+    "payeeName": "收款人名称-修改后",
+    "amount": "5800.00",
+    "remark": "退回后修改"
+  }'
+```
+
+成功响应：
+
+```json
+{
+  "respCode": "0000",
+  "respMsg": "修改成功，待复核",
+  "data": {
+    "billId": "B202607070000001",
+    "serialNo": "0002000",
+    "workDate": "2026-07-08",
+    "status": "10_PENDING_REVIEW",
+    "amount": "5800.00",
+    "versionNo": 2
+  }
+}
+```
+
+### 4.6 单据删除
+
+```http
+POST /api/cnaps/vouchers/{billId}/delete
+```
+
+`deleteReason` 为可选 JSON Body 字段。
+
+请求示例：
+
+```bash
+curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607070000001/delete" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{"deleteReason":"录入错误"}'
+```
+
+成功响应：
+
+```json
+{
+  "respCode": "0000",
+  "respMsg": "删除成功",
+  "data": {
+    "billId": "B202607070000001",
+    "status": "40_DELETED",
+    "deleteReason": "录入错误"
+  }
+}
+```
+
+### 4.7 通用查询
+
+```http
+GET /api/cnaps/vouchers
+```
+
+Query 参数：
+
+| 参数 | 类型 | 必输 | 示例 | 说明 |
+|---|---:|:---:|---|---|
+| `workDate` | string | 否 | `2026-07-07` | 工作日期过滤；未传时默认当前日期。 |
+| `status` | string | 否 | `10_PENDING_REVIEW` | 单据状态 |
+| `serialNo` | string | 否 | `0002000` | 流水号 |
+| `voucherNo` | string | 否 | `PZ202607070001` | 凭证号 |
+| `payeeName` | string | 否 | `收款人` | 收款人名称模糊查询 |
+| `payeeAccountNo` | string | 否 | `622200000000000001` | 收款账号 |
+| `includeDeleted` | boolean | 否 | `false` | 是否包含逻辑删除记录，默认 `false` |
+| `pageNo` | number | 否 | `1` | 页码 |
+| `pageSize` | number | 否 | `10` | 每页条数 |
+
+请求示例：
+
+```bash
+curl "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers?workDate=2026-07-07&status=10_PENDING_REVIEW&pageNo=1&pageSize=10"
+```
+
+成功响应：
+
+```json
+{
+  "respCode": "0000",
+  "respMsg": "查询成功",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 10,
+    "total": 1,
+    "records": [
+      {
+        "billId": "B202607070000001",
+        "workDate": "2026-07-07",
+        "serialNo": "0002000",
+        "voucherNo": "PZ202607070001",
+        "payeeAccountNo": "622200000000000001",
+        "payeeName": "收款人名称",
+        "amount": "5600.00",
+        "status": "10_PENDING_REVIEW"
+      }
+    ]
+  }
+}
+```
+
+默认不返回 `40_DELETED`；只有 `includeDeleted=true` 时才包含逻辑删除记录。
+
+### 4.8 待复核查询
+
+```http
+GET /api/cnaps/vouchers/review-list
+```
+
+Query 参数：
+
+| 参数 | 类型 | 必输 | 示例 | 说明 |
+|---|---:|:---:|---|---|
+| `workDate` | string | 否 | `2026-07-07` | 工作日期过滤；未传时默认当前日期。 |
+| `serialNo` | string | 否 | `0002000` | 流水号 |
+| `pageNo` | number | 否 | `1` | 页码 |
+| `pageSize` | number | 否 | `10` | 每页条数 |
+
+请求示例：
+
+```bash
+curl "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/review-list?workDate=2026-07-07&pageNo=1&pageSize=10"
+```
+
+成功响应：
+
+```json
+{
+  "respCode": "0000",
+  "respMsg": "查询成功",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 10,
+    "total": 1,
+    "records": [
+      {
+        "billId": "B202607070000001",
+        "serialNo": "0002000",
+        "workDate": "2026-07-07",
+        "payeeName": "收款人名称",
+        "payeeAccountNo": "622200000000000001",
+        "amount": "5600.00",
+        "status": "10_PENDING_REVIEW"
+      }
+    ]
+  }
+}
+```
+
+### 4.9 单据详情
 
 ```http
 GET /api/cnaps/vouchers/{billId}
 ```
 
-路径参数：
-
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `billId` | 是 | `B202607097720002004` | 凭证编号。 |
-
-当前成功响应：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "detail query success",
-  "data": {
-    "billId": "B202607097720002004",
-    "serialNo": "0002004",
-    "status": "10_PENDING_REVIEW",
-    "payeeAccountNo": "622200000000000001",
-    "payeeName": "Payee Name",
-    "amount": "5600.00"
-  }
-}
-```
-
-错误场景：
-
-| 场景 | HTTP 状态 | respCode | 说明 |
-| --- | --- | --- | --- |
-| `billId` 为空 | 400 | `2001` | 正常路径下不应出现。 |
-| 凭证不存在 | 404 | `3001` | 返回 `voucher not found`。 |
-
-### 5.8 修改凭证
-
-```http
-PUT /api/cnaps/vouchers/{billId}
-Content-Type: application/json
-```
-
-路径参数：
-
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `billId` | 是 | `B202607097720002004` | 凭证编号。 |
-
-请求体：
-
-```json
-{
-  "workDate": "2026-07-10",
-  "payeeAccountNo": "622200000000000456",
-  "payeeName": "Updated Payee",
-  "amount": "56.78",
-  "remark": "front-end update"
-}
-```
-
-请求字段：
-
-| JSON 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `workDate` | string | 否 | 工作日期，格式 `yyyy-MM-dd`；修改时可选。传入时更新工作日期，不传时保持原值。 |
-| `payeeAccountNo` | string | 否 | 收款账号。 |
-| `payeeName` | string | 否 | 收款人名称。 |
-| `amount` | string | 否 | 金额。 |
-| `remark` | string | 否 | 备注。 |
-
-成功行为：
-
-- 状态置为 `10_PENDING_REVIEW`。
-- 数据库 `lastAction` 置为 `UPDATE`。
-- 数据库版本号加 1。
-- 修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
-
-当前成功响应：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "update success",
-  "data": {
-    "billId": "B202607097720002004",
-    "workDate": "2026-07-10",
-    "status": "10_PENDING_REVIEW",
-    "payeeAccountNo": "622200000000000456",
-    "payeeName": "Updated Payee",
-    "amount": "56.78",
-    "remark": "front-end update"
-  }
-}
-```
-
-当前限制：后端当前不检查凭证原状态是否允许修改。
-
-### 5.9 删除凭证
-
-```http
-POST /api/cnaps/vouchers/{billId}/delete
-Content-Type: application/json
-```
-
-路径参数：
-
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `billId` | 是 | `B202607097720002004` | 凭证编号。 |
-
-请求体：
-
-```json
-{
-  "deleteReason": "input error"
-}
-```
-
-请求字段：
-
-| JSON 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `deleteReason` | string | 否 | 删除原因。 |
-
-成功行为：
-
-- 状态置为 `40_DELETED`。
-- 数据库 `lastAction` 置为 `DELETE`。
-- 数据库版本号加 1。
-
-当前成功响应：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "delete success",
-  "data": {
-    "billId": "B202607097720002004",
-    "status": "40_DELETED",
-    "deleteReason": "input error"
-  }
-}
-```
-
-当前限制：后端当前不检查凭证原状态是否允许删除。
-
-### 5.10 复核通过
-
-```http
-POST /api/cnaps/vouchers/{billId}/review-pass
-Content-Type: application/json
-```
-
-路径参数：
-
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `billId` | 是 | `B202607097720002005` | 凭证编号。 |
-
-请求体：
-
-```json
-{
-  "reviewComment": "ok"
-}
-```
-
-请求字段：
-
-| JSON 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `reviewComment` | string | 否 | 复核意见。 |
-
-成功行为：
-
-- 状态置为 `20_REVIEW_APPROVED`。
-- 数据库 `lastAction` 置为 `REVIEW_PASS`。
-- 数据库版本号加 1。
-
-当前成功响应：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "review pass success",
-  "data": {
-    "billId": "B202607097720002005",
-    "status": "20_REVIEW_APPROVED",
-    "reviewComment": "ok"
-  }
-}
-```
-
-当前限制：后端当前不检查凭证原状态，也不禁止经办人复核本人凭证。前端如需规避误操作，建议只对 `10_PENDING_REVIEW` 状态展示该操作。
-
-### 5.11 复核退回
-
-```http
-POST /api/cnaps/vouchers/{billId}/review-return
-Content-Type: application/json
-```
-
-路径参数：
-
-| 参数 | 必填 | 示例 | 说明 |
-| --- | --- | --- | --- |
-| `billId` | 是 | `B202607097720002004` | 凭证编号。 |
-
-请求体：
-
-```json
-{
-  "rejectReason": "payee info incorrect"
-}
-```
-
-请求字段：
-
-| JSON 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `rejectReason` | string | 是 | 退回原因。 |
-| `reviewComment` | string | 否 | 复核意见。当前接口可透传，但主要使用 `rejectReason`。 |
-
-成功行为：
-
-- 状态置为 `30_REVIEW_REJECTED`。
-- 数据库 `lastAction` 置为 `REVIEW_RETURN`。
-- 数据库版本号加 1。
-
-当前成功响应：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "review return success",
-  "data": {
-    "billId": "B202607097720002004",
-    "status": "30_REVIEW_REJECTED",
-    "rejectReason": "payee info incorrect"
-  }
-}
-```
-
-错误场景：
-
-| 场景 | HTTP 状态 | respCode | 说明 |
-| --- | --- | --- | --- |
-| `billId` 或 `rejectReason` 为空 | 400 | `2001` | 返回 `billId and rejectReason are required`。 |
-
-当前限制：后端当前不检查凭证原状态，也不禁止经办人复核本人凭证。前端如需规避误操作，建议只对 `10_PENDING_REVIEW` 状态展示该操作。
-
-## 6. 前端联调 curl 示例
-
-### 6.1 健康检查
+请求示例：
 
 ```bash
-curl "http://192.168.84.134:8080/ruisui-bank-sim/api/health"
+curl "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607070000001"
 ```
 
-### 6.2 创建凭证
+成功响应：
 
-```bash
-curl -X POST "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "workDate": "2026-07-09",
-    "payeeAccountNo": "622200000000000001",
-    "payeeName": "Payee Name",
-    "amount": "5600.00",
+```json
+{
+  "respCode": "0000",
+  "respMsg": "查询成功",
+  "data": {
+    "billId": "B202607070000001",
+    "workDate": "2026-07-07",
+    "serialNo": "0002000",
     "businessType": "02102",
-    "priority": "NORM",
-    "systemType": "CNAPS",
     "accountPart1": "404045",
     "accountPart2": "00772",
     "accountPart3": "000000000001",
-    "debitMode": "1",
-    "feeChargeMode": "1",
-    "sendMode": "0",
-    "faxFlag": "0",
-    "remark": "front-end create"
-  }'
+    "payeeAccountNo": "622200000000000001",
+    "payeeName": "收款人名称",
+    "priority": "NORM",
+    "systemType": "CNAPS",
+    "amount": "5600.00",
+    "status": "10_PENDING_REVIEW",
+    "versionNo": 1
+  }
+}
 ```
 
-### 6.3 查询列表计数
+不存在时返回 `3001`。
 
-```bash
-curl "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers?status=10_PENDING_REVIEW&pageNo=1&pageSize=10"
+### 4.10 复核通过
+
+```http
+POST /api/cnaps/vouchers/{billId}/review-pass
 ```
 
-### 6.4 查询详情
+`reviewComment` 为可选 JSON Body 字段。
+
+请求示例：
 
 ```bash
-curl "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607097720002004"
+curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607070000001/review-pass" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{"reviewComment":"复核通过"}'
 ```
 
-### 6.5 修改凭证
+成功响应：
+
+```json
+{
+  "respCode": "0000",
+  "respMsg": "操作已成功",
+  "data": {
+    "billId": "B202607070000001",
+    "serialNo": "0002000",
+    "amount": "5600.00",
+    "status": "20_REVIEW_APPROVED"
+  }
+}
+```
+
+本 POC 使用服务器端固定操作员，不校验复核人与录入人是否相同。同一固定 POC 操作员可以录入并复核同一单据，审计字段中的操作员值不代表登录身份。
+
+### 4.11 复核退回
+
+```http
+POST /api/cnaps/vouchers/{billId}/review-return
+```
+
+`rejectReason` 必填，`reviewComment` 可选。
+
+请求示例：
 
 ```bash
-curl -X PUT "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607097720002004" \
-  -H "Content-Type: application/json" \
+curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607070000002/review-return" \
+  -H "Content-Type: application/json; charset=UTF-8" \
   -d '{
-    "workDate": "2026-07-10",
-    "payeeAccountNo": "622200000000000456",
-    "payeeName": "Updated Payee",
-    "amount": "56.78",
-    "remark": "front-end update"
+    "rejectReason": "收款人户名不完整",
+    "reviewComment": "请修改后重新提交"
   }'
 ```
 
-### 6.6 复核通过
+成功响应：
 
-```bash
-curl -X POST "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607097720002005/review-pass" \
-  -H "Content-Type: application/json" \
-  -d '{"reviewComment":"ok"}'
+```json
+{
+  "respCode": "0000",
+  "respMsg": "复核退回成功",
+  "data": {
+    "billId": "B202607070000002",
+    "serialNo": "0002001",
+    "amount": "5600.00",
+    "status": "30_REVIEW_REJECTED",
+    "rejectReason": "收款人户名不完整"
+  }
+}
 ```
 
-### 6.7 复核退回
+退回原因缺失时返回 `2001`。身份简化规则与复核通过一致。
 
-```bash
-curl -X POST "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607097720002004/review-return" \
-  -H "Content-Type: application/json" \
-  -d '{"rejectReason":"payee info incorrect"}'
+## 5. 单据字段字典
+
+| JSON 字段 | 类型 | 创建必输 | 说明 |
+|---|---:|:---:|---|
+| `billId` | string | 响应生成 | 单据编号 |
+| `workDate` | string | 是 | 业务日期，创建时必填，修改时可选 |
+| `serialNo` | string | 响应生成 | 流水号 |
+| `businessType` | string | 是 | 业务种类 |
+| `accountPart1` | string | 是 | 付款账号一段 |
+| `accountPart2` | string | 是 | 付款账号二段 |
+| `accountPart3` | string | 是 | 付款账号三段 |
+| `accountName` | string | 否 | 付款账户户名 |
+| `payerName` | string | 否 | 付款人名称 |
+| `payeeAccountNo` | string | 是 | 收款账号 |
+| `payeeName` | string | 是 | 收款人名称 |
+| `priority` | string | 是 | 优先级 |
+| `receiveBankNo` | string | 否 | 接收行号 |
+| `receiveBankName` | string | 否 | 接收行名称 |
+| `systemType` | string | 是 | 系统类型 |
+| `amount` | string | 是 | 金额，大于 0 且最多两位小数 |
+| `debitMode` | string | 否 | 扣收方式 |
+| `feeAmount` | string | 否 | 手续费，不小于 0 |
+| `feeChargeMode` | string | 否 | 手续费方式 |
+| `sendMode` | string | 否 | 发送方式 |
+| `faxFlag` | string | 否 | 传真标志 |
+| `voucherNo` | string | 否 | 凭证号 |
+| `remark` | string | 否 | 备注 |
+| `status` | string | 响应返回 | 单据状态 |
+| `reviewComment` | string | 否 | 复核意见 |
+| `rejectReason` | string | 复核退回必输 | 退回原因 |
+| `deleteReason` | string | 否 | 删除原因 |
+| `versionNo` | number | 响应返回 | 版本号 |
+
+## 6. 错误码
+
+错误响应也只包含三字段包络，`data` 为 `null`。
+
+| 错误码 | HTTP 状态 | 含义 | 典型场景 |
+|---|---:|---|---|
+| `0000` | 200 | 成功 | 交易成功 |
+| `2001` | 400 | 必填字段缺失 | 创建缺少必填项、复核退回缺少原因 |
+| `2002` | 400 | 字段格式错误 | 日期或金额格式错误 |
+| `2003` | 400 | 字典值无效 | 业务种类、优先级等无效 |
+| `3001` | 404 | 单据不存在 | 详情、修改、删除或复核找不到单据 |
+| `3003` | 409 | 当前状态不允许操作 | 已复核单据删除、已删除单据修改 |
+| `3004` | 409 | 复核时单据状态已变化 | 重复复核或并发复核 |
+| `4001` | 500 | 数据库错误 | Oracle 连接或 SQL/OCI 执行失败 |
+| `4002` | 504 | Tuxedo 服务超时 | WebFE 调用超时 |
+| `4003` | 503 | Tuxedo 服务不可用 | 服务未启动或路由失败 |
+| `9999` | 500 | 未分类错误 | 未分类异常 |
+
+失败示例：
+
+```json
+{
+  "respCode": "4003",
+  "respMsg": "Tuxedo 服务不可用：CNAPS5701E",
+  "data": null
+}
 ```
 
-### 6.8 删除凭证
+## 7. 典型联调流程
 
-```bash
-curl -X POST "http://192.168.84.134:8080/ruisui-bank-sim/api/cnaps/vouchers/B202607097720002004/delete" \
-  -H "Content-Type: application/json" \
-  -d '{"deleteReason":"input error"}'
+### 7.1 录入后复核通过
+
+```text
+POST /api/cnaps/vouchers
+GET  /api/cnaps/vouchers/review-list
+GET  /api/cnaps/vouchers/{billId}
+POST /api/cnaps/vouchers/{billId}/review-pass
+GET  /api/cnaps/vouchers/{billId}
 ```
 
-## 7. 当前 POC 限制
+预期状态：`10_PENDING_REVIEW` → `20_REVIEW_APPROVED`。
 
-1. 列表和复核列表当前只返回 `totalElements` / `totalPages`，不返回明细数组。
-2. 字典接口当前只暴露 `systemType`，完整 `dictCode` / `dictName` 需要扩展 Jolt metadata。
-3. 银行接口当前固定返回一条测试银行，不按参数过滤。
-4. 修改、删除、复核当前未做完整状态流转校验，建议前端先按状态控制按钮展示。
-5. 当前 VM 上中文从 Oracle 读回时可能出现编码问题，联调示例建议先使用 ASCII；后续需要统一配置 Oracle/Tomcat/Tuxedo 的字符集。
+### 7.2 录入后复核退回并修改
+
+```text
+POST /api/cnaps/vouchers
+POST /api/cnaps/vouchers/{billId}/review-return
+PUT  /api/cnaps/vouchers/{billId}
+GET  /api/cnaps/vouchers/{billId}
+```
+
+预期状态：`10_PENDING_REVIEW` → `30_REVIEW_REJECTED` → `10_PENDING_REVIEW`。
+
+### 7.3 逻辑删除
+
+```text
+POST /api/cnaps/vouchers
+POST /api/cnaps/vouchers/{billId}/delete
+GET  /api/cnaps/vouchers?includeDeleted=true&pageNo=1&pageSize=10
+```
+
+预期状态：`10_PENDING_REVIEW` → `40_DELETED`。
+
+## 8. POC 边界
+
+- 不提供登录、账号、角色、权限或操作员切换。
+- 固定操作员和机构只用于兼容现有 FML32 与审计字段。
+- 不做真实扣账、真实 CNAPS 发送或复杂审计。
+- Native Tuxedo/OCI 的编译和部署需要配置好的 Linux/Tuxedo/Oracle 环境，不属于 HTTP 文档契约。

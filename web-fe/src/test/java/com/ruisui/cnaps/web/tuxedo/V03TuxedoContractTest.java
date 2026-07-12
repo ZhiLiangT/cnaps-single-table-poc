@@ -62,4 +62,23 @@ class V03TuxedoContractTest {
             .containsEntry("service", "SYSHEALTH")
             .containsEntry("checkTime", "2026-07-07 10:00:00");
     }
+
+    @Test
+    void mapsPartyAddressAndPayerBankDetailFieldsToJsonNames() {
+        ApiResponse<Object> response = responseMapper.toApiResponse(
+            "REQ-FIELDS-1",
+            TuxedoResponse.ok("查询成功", Map.of(
+                "PAYER_ADDRESS", "上海市浦东新区",
+                "PAYEE_ADDRESS", "北京市朝阳区",
+                "PAYER_BANK_NAME", "中国示例银行上海分行"
+            ))
+        );
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        ((Map<?, ?>) response.data()).forEach((key, value) -> data.put(String.valueOf(key), value));
+        assertThat(data)
+            .containsEntry("payerAddress", "上海市浦东新区")
+            .containsEntry("payeeAddress", "北京市朝阳区")
+            .containsEntry("payerBankName", "中国示例银行上海分行");
+    }
 }

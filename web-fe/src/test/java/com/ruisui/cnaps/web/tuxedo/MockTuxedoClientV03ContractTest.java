@@ -517,6 +517,65 @@ class MockTuxedoClientV03ContractTest {
             .containsEntry("REVIEW_COMMENT", "请补全附件");
     }
 
+    @Test
+    void partyAddressFieldsRoundTripUpdateClearAndStayOutOfLists() {
+        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of(
+            "PAYER_ADDRESS", "付款地址-原值",
+            "PAYEE_ADDRESS", "收款地址-原值",
+            "PAYER_BANK_NAME", "开户行-原值"
+        )));
+        Object billId = created.fields().get("BILL_ID");
+
+        TuxedoResponse original = client.call("CNAPS5702I", request(Map.of("BILL_ID", billId)));
+        assertThat(original.fields())
+            .containsEntry("PAYER_ADDRESS", "付款地址-原值")
+            .containsEntry("PAYEE_ADDRESS", "收款地址-原值")
+            .containsEntry("PAYER_BANK_NAME", "开户行-原值");
+
+        client.call("CNAPS5701U", request(Map.of(
+            "BILL_ID", billId,
+            "PAYER_ADDRESS", "付款地址-新值",
+            "PAYER_BANK_NAME", ""
+        )));
+        TuxedoResponse updated = client.call("CNAPS5702I", request(Map.of("BILL_ID", billId)));
+        assertThat(updated.fields())
+            .containsEntry("PAYER_ADDRESS", "付款地址-新值")
+            .containsEntry("PAYEE_ADDRESS", "收款地址-原值")
+            .containsEntry("PAYER_BANK_NAME", "");
+
+        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+            Map<String, Object> record = records(page(client.call(service, request(Map.of())))).get(0);
+            assertThat(record).doesNotContainKeys("PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME");
+        }
+    }
+
+    @Test
+    void partyAddressFieldsEnforceUnicodeCharacterLimitsOnCreateAndUpdate() {
+        TuxedoResponse maximum = client.call("CNAPS5701E", request(Map.of(
+            "PAYER_ADDRESS", "地".repeat(256),
+            "PAYEE_ADDRESS", "址".repeat(256),
+            "PAYER_BANK_NAME", "行".repeat(128)
+        )));
+        assertThat(maximum.respCode()).isEqualTo("0000");
+
+        assertThat(client.call("CNAPS5701E", request(Map.of(
+            "PAYER_ADDRESS", "地".repeat(257)
+        ))).respCode()).isEqualTo("2002");
+        assertThat(client.call("CNAPS5701E", request(Map.of(
+            "PAYER_BANK_NAME", "行".repeat(129)
+        ))).respCode()).isEqualTo("2002");
+
+        Object billId = maximum.fields().get("BILL_ID");
+        assertThat(client.call("CNAPS5701U", request(Map.of(
+            "BILL_ID", billId,
+            "PAYEE_ADDRESS", "址".repeat(257)
+        ))).respCode()).isEqualTo("2002");
+        assertThat(client.call("CNAPS5701U", request(Map.of(
+            "BILL_ID", billId,
+            "PAYER_BANK_NAME", "行".repeat(129)
+        ))).respCode()).isEqualTo("2002");
+    }
+
     private TuxedoRequest request(Map<String, ?> overrides) {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("REQ_ID", "REQ-POC");

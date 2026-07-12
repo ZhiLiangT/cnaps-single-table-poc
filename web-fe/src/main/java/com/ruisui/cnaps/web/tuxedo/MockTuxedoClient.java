@@ -35,8 +35,11 @@ public class MockTuxedoClient implements TuxedoClient {
         "ACCOUNT_PART3",
         "ACCOUNT_NAME",
         "PAYER_NAME",
+        "PAYER_ADDRESS",
         "PAYEE_ACCT",
         "PAYEE_NAME",
+        "PAYEE_ADDRESS",
+        "PAYER_BANK_NAME",
         "PRIORITY",
         "RECEIVE_BANK_NO",
         "RECEIVE_BANK_NAME",
@@ -49,6 +52,9 @@ public class MockTuxedoClient implements TuxedoClient {
         "FAX_FLAG",
         "VOUCHER_NO",
         "REMARK"
+    );
+    private static final Set<String> DETAIL_ONLY_FIELDS = Set.of(
+        "PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME"
     );
     private static final Map<String, List<Map<String, Object>>> DICTIONARIES = Map.of(
         "BUSINESS_TYPE", List.of(dictItem("BUSINESS_TYPE", "02102", "普通汇兑", 1)),
@@ -269,7 +275,7 @@ public class MockTuxedoClient implements TuxedoClient {
             .filter(voucher -> Boolean.parseBoolean(text(request, "INCLUDE_DELETED", "false"))
                 || !"40_DELETED".equals(voucher.get("STATUS")))
             .sorted(Comparator.comparing(voucher -> String.valueOf(voucher.get("BILL_ID"))))
-            .map(voucher -> (Map<String, Object>) new LinkedHashMap<>(voucher))
+            .map(this::listRecord)
             .toList();
         return Map.of(
             "PAGE_NO", pageNo,
@@ -340,6 +346,10 @@ public class MockTuxedoClient implements TuxedoClient {
         if (!validMoney(text(request, "AMOUNT"), false) || !validMoney(text(request, "FEE_AMOUNT", "0.00"), true)) {
             return TuxedoResponse.fail("2002", "金额格式错误");
         }
+        TuxedoResponse partyFields = validatePartyFields(request);
+        if (partyFields != null) {
+            return partyFields;
+        }
         return validateDictionaryFields(request);
     }
 
@@ -353,7 +363,34 @@ public class MockTuxedoClient implements TuxedoClient {
         if (request.fields().containsKey("WORK_DATE") && !validWorkDate(text(request, "WORK_DATE"))) {
             return TuxedoResponse.fail("2002", "工作日期格式错误");
         }
+        TuxedoResponse partyFields = validatePartyFields(request);
+        if (partyFields != null) {
+            return partyFields;
+        }
         return validateDictionaryFields(request);
+    }
+
+    private TuxedoResponse validatePartyFields(TuxedoRequest request) {
+        if (tooLong(request, "PAYER_ADDRESS", 256)
+            || tooLong(request, "PAYEE_ADDRESS", 256)
+            || tooLong(request, "PAYER_BANK_NAME", 128)) {
+            return TuxedoResponse.fail("2002", "字段长度超限");
+        }
+        return null;
+    }
+
+    private boolean tooLong(TuxedoRequest request, String field, int maximum) {
+        if (!request.fields().containsKey(field)) {
+            return false;
+        }
+        String value = text(request, field, "");
+        return value.codePointCount(0, value.length()) > maximum;
+    }
+
+    private Map<String, Object> listRecord(Map<String, Object> voucher) {
+        Map<String, Object> record = new LinkedHashMap<>(voucher);
+        DETAIL_ONLY_FIELDS.forEach(record::remove);
+        return record;
     }
 
     private TuxedoResponse validateDictionaryFields(TuxedoRequest request) {

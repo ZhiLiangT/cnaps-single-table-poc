@@ -33,7 +33,10 @@ class TuxedoRequestMapperTest {
             Map.of(
                 "amount", "1.00",
                 "payeeAccountNo", "622200000000000001",
-                "workDate", "2026-07-08"
+                "workDate", "2026-07-08",
+                "payerAddress", "上海市浦东新区",
+                "payeeAddress", "北京市朝阳区",
+                "payerBankName", "中国示例银行上海分行"
             )
         );
 
@@ -44,7 +47,10 @@ class TuxedoRequestMapperTest {
             .containsEntry("BRANCH_NO", "772")
             .containsEntry("WORK_DATE", "2026-07-08")
             .containsEntry("AMOUNT", "1.00")
-            .containsEntry("PAYEE_ACCT", "622200000000000001");
+            .containsEntry("PAYEE_ACCT", "622200000000000001")
+            .containsEntry("PAYER_ADDRESS", "上海市浦东新区")
+            .containsEntry("PAYEE_ADDRESS", "北京市朝阳区")
+            .containsEntry("PAYER_BANK_NAME", "中国示例银行上海分行");
     }
 
     @Test

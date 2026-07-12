@@ -1,9 +1,12 @@
 package com.ruisui.cnaps.web.tuxedo;
 
 import bea.jolt.JoltSessionAttributes;
+import com.ruisui.cnaps.web.dto.ApiResponse;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +62,43 @@ class JoltTuxedoClientTest {
         );
 
         assertThat(fields).containsEntry("WORK_DATE", "2026-07-11");
+    }
+
+    @Test
+    void readsAndMapsEveryVoucherFieldFromSingleRecordService() throws Exception {
+        JoltTuxedoClient client = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"));
+        Method readResponseFields = JoltTuxedoClient.class.getDeclaredMethod(
+            "readResponseFields",
+            String.class,
+            Class.class,
+            Object.class
+        );
+        readResponseFields.setAccessible(true);
+        Field voucherFieldsField = JoltTuxedoClient.class.getDeclaredField("VOUCHER_FIELDS");
+        voucherFieldsField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<String> voucherFields = (List<String>) voucherFieldsField.get(null);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> fields = (Map<String, Object>) readResponseFields.invoke(
+            client,
+            "CNAPS5702I",
+            FakeCompleteVoucherService.class,
+            new FakeCompleteVoucherService()
+        );
+        ApiResponse<Object> response = new TuxedoResponseMapper().toApiResponse(
+            "REQ-1",
+            TuxedoResponse.ok("ok", fields)
+        );
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mapped = (Map<String, Object>) response.data();
+
+        assertThat(fields).containsKeys(voucherFields.toArray(String[]::new));
+        for (String voucherField : voucherFields) {
+            Object expected = "VERSION_NO".equals(voucherField) ? 7L : "value-" + voucherField;
+            assertThat(mapped.values()).as(voucherField).contains(expected);
+        }
+        assertThat(mapped).containsEntry("deleteTime", "value-DELETE_TIME");
     }
 
     @Test
@@ -134,6 +174,16 @@ class JoltTuxedoClientTest {
     public static final class FakeRemoteService {
         public String getStringDef(String fieldName, String defaultValue) {
             return "WORK_DATE".equals(fieldName) ? "2026-07-11" : defaultValue;
+        }
+    }
+
+    public static final class FakeCompleteVoucherService {
+        public String getStringDef(String fieldName, String defaultValue) {
+            return "VERSION_NO".equals(fieldName) ? defaultValue : "value-" + fieldName;
+        }
+
+        public long getLongDef(String fieldName, long defaultValue) {
+            return "VERSION_NO".equals(fieldName) ? 7L : defaultValue;
         }
     }
 

@@ -71,6 +71,9 @@ public class MockTuxedoClient implements TuxedoClient {
         "SEND_MODE", Set.of("0"),
         "FAX_FLAG", Set.of("0", "1")
     );
+    private static final Set<String> OPTIONAL_DICTIONARY_FIELDS = Set.of(
+        "DEBIT_MODE", "FEE_CHARGE_MODE", "SEND_MODE", "FAX_FLAG"
+    );
     private static final List<Map<String, Object>> BANKS = List.of(Map.of(
         "BANK_NO", "102290000002",
         "BANK_NAME", "接收行名称",
@@ -122,6 +125,11 @@ public class MockTuxedoClient implements TuxedoClient {
         Map<String, Object> voucher = new LinkedHashMap<>();
         for (String field : BUSINESS_FIELDS) {
             if (request.fields().containsKey(field)) {
+                String value = text(request, field);
+                if (OPTIONAL_DICTIONARY_FIELDS.contains(field)
+                    && (value == null || value.isBlank())) {
+                    continue;
+                }
                 voucher.put(field, request.fields().get(field));
             }
         }
@@ -159,6 +167,11 @@ public class MockTuxedoClient implements TuxedoClient {
         }
         for (String field : BUSINESS_FIELDS) {
             if (request.fields().containsKey(field)) {
+                String value = text(request, field);
+                if (OPTIONAL_DICTIONARY_FIELDS.contains(field)
+                    && (value == null || value.isBlank())) {
+                    continue;
+                }
                 voucher.put(field, request.fields().get(field));
             }
         }
@@ -345,8 +358,15 @@ public class MockTuxedoClient implements TuxedoClient {
 
     private TuxedoResponse validateDictionaryFields(TuxedoRequest request) {
         for (Map.Entry<String, Set<String>> dictionary : DICTIONARY_VALUES.entrySet()) {
-            if (request.fields().containsKey(dictionary.getKey())
-                && !dictionary.getValue().contains(text(request, dictionary.getKey()))) {
+            if (!request.fields().containsKey(dictionary.getKey())) {
+                continue;
+            }
+            String value = text(request, dictionary.getKey());
+            if (OPTIONAL_DICTIONARY_FIELDS.contains(dictionary.getKey())
+                && (value == null || value.isBlank())) {
+                continue;
+            }
+            if (!dictionary.getValue().contains(value)) {
                 return TuxedoResponse.fail("2003", "字典值不存在：" + dictionary.getKey());
             }
         }

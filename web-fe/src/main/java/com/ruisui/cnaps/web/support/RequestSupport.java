@@ -53,8 +53,8 @@ public final class RequestSupport {
             return false;
         }
         try {
-            LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
-            return true;
+            LocalDate parsed = LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
+            return parsed.getYear() >= 1 && parsed.getYear() <= 9999;
         } catch (DateTimeParseException ex) {
             return false;
         }

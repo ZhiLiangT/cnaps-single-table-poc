@@ -421,6 +421,11 @@ class MockTuxedoClientV03ContractTest {
             assertThat(client.call("CNAPS5701E", new TuxedoRequest(fields)).respCode())
                 .as(field)
                 .isEqualTo("2001");
+
+            fields.put(field, " ");
+            assertThat(client.call("CNAPS5701E", new TuxedoRequest(fields)).respCode())
+                .as("blank " + field)
+                .isEqualTo("2001");
         }
     }
 
@@ -447,6 +452,43 @@ class MockTuxedoClientV03ContractTest {
                 request(Map.of("BILL_ID", created.fields().get("BILL_ID"), invalid.getKey(), invalid.getValue()))
             ).respCode()).as("update " + invalid.getKey()).isEqualTo("2003");
         }
+    }
+
+    @Test
+    void blankOptionalDictionaryValuesDefaultOnCreateAndPreserveOnUpdate() {
+        Map<String, Object> blankOptional = Map.of(
+            "DEBIT_MODE", " ",
+            "FEE_CHARGE_MODE", "",
+            "SEND_MODE", " ",
+            "FAX_FLAG", ""
+        );
+
+        TuxedoResponse defaulted = client.call("CNAPS5701E", request(blankOptional));
+        assertThat(defaulted.respCode()).isEqualTo("0000");
+        assertThat(defaulted.fields())
+            .containsEntry("DEBIT_MODE", "1")
+            .containsEntry("FEE_CHARGE_MODE", "1")
+            .containsEntry("SEND_MODE", "0")
+            .containsEntry("FAX_FLAG", "0");
+
+        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of("FAX_FLAG", "1")));
+        TuxedoResponse updated = client.call(
+            "CNAPS5701U",
+            request(Map.ofEntries(
+                Map.entry("BILL_ID", created.fields().get("BILL_ID")),
+                Map.entry("DEBIT_MODE", " "),
+                Map.entry("FEE_CHARGE_MODE", ""),
+                Map.entry("SEND_MODE", " "),
+                Map.entry("FAX_FLAG", "")
+            ))
+        );
+
+        assertThat(updated.respCode()).isEqualTo("0000");
+        assertThat(updated.fields())
+            .containsEntry("DEBIT_MODE", "1")
+            .containsEntry("FEE_CHARGE_MODE", "1")
+            .containsEntry("SEND_MODE", "0")
+            .containsEntry("FAX_FLAG", "1");
     }
 
     @Test

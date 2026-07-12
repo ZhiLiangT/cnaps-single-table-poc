@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "cnaps_db.h"
 #include "cnaps_fields.h"
 #include "cnaps_service.h"
@@ -17,6 +18,7 @@ void CNAPS4609Q(TPSVCINFO *rqst)
     FBFR32 *fbfr = (FBFR32 *)rqst->data;
     cnaps_voucher_row rows[CNAPS_QUERY_MAX_ROWS];
     char work_date[11] = {0};
+    char raw_work_date[513] = {0};
     char branch_no[13] = {0};
     char status[33] = {0};
     char serial_no[17] = {0};
@@ -33,7 +35,7 @@ void CNAPS4609Q(TPSVCINFO *rqst)
     int total;
 
     cnaps_log_service_start("CNAPS4609Q");
-    get_field(fbfr, CNAPS_F_WORK_DATE, work_date, sizeof(work_date));
+    get_field(fbfr, CNAPS_F_WORK_DATE, raw_work_date, sizeof(raw_work_date));
     get_field(fbfr, CNAPS_F_BRANCH_NO, branch_no, sizeof(branch_no));
     get_field(fbfr, CNAPS_F_STATUS, status, sizeof(status));
     get_field(fbfr, CNAPS_F_SERIAL_NO, serial_no, sizeof(serial_no));
@@ -41,10 +43,11 @@ void CNAPS4609Q(TPSVCINFO *rqst)
     get_field(fbfr, CNAPS_F_PAYEE_NAME, payee_name, sizeof(payee_name));
     get_field(fbfr, CNAPS_F_PAYEE_ACCT, payee_account_no, sizeof(payee_account_no));
     get_field(fbfr, CNAPS_F_INCLUDE_DELETED, include_deleted_text, sizeof(include_deleted_text));
-    if (work_date[0] != '\0' && !cnaps_valid_work_date(work_date)) {
+    if (raw_work_date[0] != '\0' && !cnaps_valid_work_date(raw_work_date)) {
         cnaps_return_error(rqst, "2002", "invalid work date");
         return;
     }
+    snprintf(work_date, sizeof(work_date), "%s", raw_work_date);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_NO, &page_no_value);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_SIZE, &page_size_value);
     page_no = page_no_value > 0 && page_no_value <= 2147483647L ? (int)page_no_value : 1;
@@ -87,6 +90,7 @@ void CNAPS5702Q(TPSVCINFO *rqst)
     FBFR32 *fbfr = (FBFR32 *)rqst->data;
     cnaps_voucher_row rows[CNAPS_QUERY_MAX_ROWS];
     char work_date[11] = {0};
+    char raw_work_date[513] = {0};
     char branch_no[13] = {0};
     char serial_no[17] = {0};
     long page_no_value = 1;
@@ -97,13 +101,14 @@ void CNAPS5702Q(TPSVCINFO *rqst)
     int total;
 
     cnaps_log_service_start("CNAPS5702Q");
-    get_field(fbfr, CNAPS_F_WORK_DATE, work_date, sizeof(work_date));
+    get_field(fbfr, CNAPS_F_WORK_DATE, raw_work_date, sizeof(raw_work_date));
     get_field(fbfr, CNAPS_F_BRANCH_NO, branch_no, sizeof(branch_no));
     get_field(fbfr, CNAPS_F_SERIAL_NO, serial_no, sizeof(serial_no));
-    if (work_date[0] != '\0' && !cnaps_valid_work_date(work_date)) {
+    if (raw_work_date[0] != '\0' && !cnaps_valid_work_date(raw_work_date)) {
         cnaps_return_error(rqst, "2002", "invalid work date");
         return;
     }
+    snprintf(work_date, sizeof(work_date), "%s", raw_work_date);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_NO, &page_no_value);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_SIZE, &page_size_value);
     page_no = page_no_value > 0 && page_no_value <= 2147483647L ? (int)page_no_value : 1;

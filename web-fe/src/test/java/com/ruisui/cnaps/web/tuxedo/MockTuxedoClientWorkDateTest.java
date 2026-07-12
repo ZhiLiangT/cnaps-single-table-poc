@@ -135,6 +135,35 @@ class MockTuxedoClientWorkDateTest {
         }
     }
 
+    @Test
+    void rejectsYearZeroAndTrailingDataAcrossCreateUpdateAndQueries() {
+        for (String invalidWorkDate : List.of("0000-01-01", "2026-07-10-extra")) {
+            assertThat(client.call(
+                "CNAPS5701E",
+                request(Map.of("WORK_DATE", invalidWorkDate))
+            ).respCode()).as("create " + invalidWorkDate).isEqualTo("2002");
+
+            TuxedoResponse created = client.call(
+                "CNAPS5701E",
+                request(Map.of("WORK_DATE", "2026-07-10"))
+            );
+            assertThat(client.call(
+                "CNAPS5701U",
+                request(Map.of(
+                    "BILL_ID", created.fields().get("BILL_ID"),
+                    "WORK_DATE", invalidWorkDate
+                ))
+            ).respCode()).as("update " + invalidWorkDate).isEqualTo("2002");
+
+            for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+                assertThat(client.call(
+                    service,
+                    request(Map.of("WORK_DATE", invalidWorkDate))
+                ).respCode()).as(service + " " + invalidWorkDate).isEqualTo("2002");
+            }
+        }
+    }
+
     private TuxedoResponse createVoucher(String workDate, String branchNo) {
         return client.call(
             "CNAPS5701E",

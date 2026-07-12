@@ -60,10 +60,13 @@ class TuxedoCSourceContractTest {
         String dbHelper = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
 
         assertThat(createSource)
-            .contains("row.work_date[0] == '\\0'")
+            .contains("is_blank(raw_work_date)", "!cnaps_valid_work_date(raw_work_date)")
             .doesNotContain("row->work_date, sizeof(row->work_date), \"2026-07-09\"");
         assertThat(updateSource)
-            .contains("CNAPS_F_WORK_DATE, row.work_date");
+            .contains(
+                "CNAPS_F_WORK_DATE, raw_work_date",
+                "snprintf(row.work_date, sizeof(row.work_date), \"%s\", raw_work_date)"
+            );
         assertThat(dbHelper)
             .contains("WORK_DATE=COALESCE(TO_DATE(:work_date, 'YYYY-MM-DD'), WORK_DATE)");
     }
@@ -111,11 +114,12 @@ class TuxedoCSourceContractTest {
         String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
 
         assertThat(create).contains(
-            "is_blank(row->work_date)", "is_blank(row->account_part1)",
-            "is_blank(row->payee_account_no)", "valid_work_date(row.work_date)", "2002"
+            "is_blank(row->work_date)", "is_blank(row->business_type)",
+            "is_blank(row->priority)", "is_blank(row->system_type)", "is_blank(row->account_part1)",
+            "is_blank(row->payee_account_no)", "cnaps_valid_work_date(raw_work_date)", "2002"
         );
         assertThat(update).contains(
-            "work_date_supplied", "valid_work_date(row.work_date)", "2002"
+            "work_date_supplied", "cnaps_valid_work_date(raw_work_date)", "2002"
         );
     }
 
@@ -237,10 +241,10 @@ class TuxedoCSourceContractTest {
         assertThat(header).contains("int cnaps_valid_work_date(const char *value);");
         assertThat(validation).contains("cnaps_valid_work_date", "days_by_month", "year % 400");
         assertThat(query).contains(
-            "work_date[0] != '\\0' && !cnaps_valid_work_date(work_date)",
+            "raw_work_date[0] != '\\0' && !cnaps_valid_work_date(raw_work_date)",
             "cnaps_return_error(rqst, \"2002\", \"invalid work date\")"
         );
-        assertThat(query.indexOf("cnaps_valid_work_date(work_date)"))
+        assertThat(query.indexOf("cnaps_valid_work_date(raw_work_date)"))
             .isLessThan(query.indexOf("db_query_vouchers("));
     }
 
@@ -255,5 +259,53 @@ class TuxedoCSourceContractTest {
         assertThat(review)
             .contains("snprintf(row.review_comment, sizeof(row.review_comment), \"%s\", review_comment)")
             .doesNotContain("row.review_comment[0] = '\\0';");
+    }
+
+    @Test
+    void nativeWorkDateValidationUsesCompleteUntruncatedInput() throws Exception {
+        String validation = Files.readString(root.resolve("tuxedo-server/src/common/validation_helper.c"));
+        String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
+        String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
+        String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
+
+        assertThat(validation).contains("year == 0", "strlen(value) != 10");
+        assertThat(create).contains(
+            "char raw_work_date[513]", "CNAPS_F_WORK_DATE, raw_work_date, sizeof(raw_work_date)",
+            "!cnaps_valid_work_date(raw_work_date)", "row_from_create_request(fbfr, &row, raw_work_date)"
+        );
+        assertThat(create.indexOf("!cnaps_valid_work_date(raw_work_date)"))
+            .isLessThan(create.indexOf("row_from_create_request(fbfr, &row, raw_work_date)"));
+        assertThat(update).contains(
+            "char raw_work_date[513]", "CNAPS_F_WORK_DATE, raw_work_date, sizeof(raw_work_date)",
+            "!cnaps_valid_work_date(raw_work_date)",
+            "snprintf(row.work_date, sizeof(row.work_date), \"%s\", raw_work_date)"
+        ).doesNotContain(
+            "overlay_field(fbfr, CNAPS_F_WORK_DATE, row.work_date, sizeof(row.work_date))"
+        );
+        assertThat(countOccurrences(query, "char raw_work_date[513]")).isEqualTo(2);
+        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_work_date)")).isEqualTo(2);
+        assertThat(countOccurrences(query, "snprintf(work_date, sizeof(work_date), \"%s\", raw_work_date)")).isEqualTo(2);
+    }
+
+    @Test
+    void nativeBlankOptionalDictionaryValuesDefaultOrRemainUnchanged() throws Exception {
+        String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
+        String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
+
+        assertThat(create).contains(
+            "is_blank(row->debit_mode)", "is_blank(row->fee_charge_mode)",
+            "is_blank(row->send_mode)", "is_blank(row->fax_flag)", "apply_optional_defaults(&row)"
+        );
+        assertThat(update).contains(
+            "overlay_optional_dictionary_field", "is_blank(value)",
+            "debit_mode_supplied = overlay_optional_dictionary_field",
+            "fee_charge_mode_supplied = overlay_optional_dictionary_field",
+            "send_mode_supplied = overlay_optional_dictionary_field",
+            "fax_flag_supplied = overlay_optional_dictionary_field"
+        );
+    }
+
+    private int countOccurrences(String value, String token) {
+        return (value.length() - value.replace(token, "").length()) / token.length();
     }
 }

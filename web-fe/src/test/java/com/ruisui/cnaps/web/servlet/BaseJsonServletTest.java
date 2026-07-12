@@ -126,23 +126,25 @@ class BaseJsonServletTest {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
-        for (Map.Entry<String, String> testCase : Map.of(
-            "/api/cnaps/vouchers", "2026/07/10",
-            "/api/cnaps/vouchers/review-list", "2026-02-30"
-        ).entrySet()) {
+        for (String[] testCase : new String[][] {
+            {"/api/cnaps/vouchers", "2026/07/10"},
+            {"/api/cnaps/vouchers", "0000-01-01"},
+            {"/api/cnaps/vouchers/review-list", "2026-02-30"},
+            {"/api/cnaps/vouchers/review-list", "2026-07-10-extra"}
+        }) {
             captured.set(null);
             ByteArrayOutputStream body = new ByteArrayOutputStream();
             AtomicInteger status = new AtomicInteger();
             servlet.doGet(
-                request(testCase.getKey(), null, Map.of("workDate", new String[] {testCase.getValue()})),
+                request(testCase[0], null, Map.of("workDate", new String[] {testCase[1]})),
                 response(body, status)
             );
 
-            assertThat(status.get()).as(testCase.getKey()).isEqualTo(400);
+            assertThat(status.get()).as(testCase[0] + " " + testCase[1]).isEqualTo(400);
             assertThat(body.toString(java.nio.charset.StandardCharsets.UTF_8))
-                .as(testCase.getKey())
+                .as(testCase[0] + " " + testCase[1])
                 .isEqualTo("{\"respCode\":\"2002\",\"respMsg\":\"工作日期格式错误\",\"data\":null}");
-            assertThat(captured.get()).as(testCase.getKey()).isNull();
+            assertThat(captured.get()).as(testCase[0] + " " + testCase[1]).isNull();
         }
     }
 

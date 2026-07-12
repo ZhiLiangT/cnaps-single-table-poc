@@ -72,6 +72,14 @@ class RequestSupportTest {
         assertThat(fields).containsEntry("workDate", "2026-07-08");
     }
 
+    @Test
+    void validatesOnlyFourDigitPositiveCalendarYears() {
+        assertThat(RequestSupport.isValidWorkDate("0001-01-01")).isTrue();
+        assertThat(RequestSupport.isValidWorkDate("9999-12-31")).isTrue();
+        assertThat(RequestSupport.isValidWorkDate("0000-01-01")).isFalse();
+        assertThat(RequestSupport.isValidWorkDate("2026-07-10-extra")).isFalse();
+    }
+
     private HttpServletRequest request(String uri, String contextPath, Map<String, String[]> parameters) {
         return (HttpServletRequest) Proxy.newProxyInstance(
             getClass().getClassLoader(),

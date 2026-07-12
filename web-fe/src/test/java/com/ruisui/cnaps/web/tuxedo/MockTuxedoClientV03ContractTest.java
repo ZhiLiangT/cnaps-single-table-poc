@@ -412,6 +412,69 @@ class MockTuxedoClientV03ContractTest {
         )))).isEmpty();
     }
 
+    @Test
+    void createRejectsMissingRequiredDictionaryFields() {
+        for (String field : List.of("BUSINESS_TYPE", "PRIORITY", "SYSTEM_TYPE")) {
+            Map<String, Object> fields = new LinkedHashMap<>(request(Map.of()).fields());
+            fields.remove(field);
+
+            assertThat(client.call("CNAPS5701E", new TuxedoRequest(fields)).respCode())
+                .as(field)
+                .isEqualTo("2001");
+        }
+    }
+
+    @Test
+    void createAndUpdateRejectUnsupportedDictionaryValues() {
+        Map<String, String> invalidValues = Map.of(
+            "BUSINESS_TYPE", "99999",
+            "PRIORITY", "URGENT",
+            "SYSTEM_TYPE", "HVPS",
+            "DEBIT_MODE", "2",
+            "FEE_CHARGE_MODE", "2",
+            "SEND_MODE", "1",
+            "FAX_FLAG", "2"
+        );
+        for (Map.Entry<String, String> invalid : invalidValues.entrySet()) {
+            assertThat(client.call(
+                "CNAPS5701E",
+                request(Map.of(invalid.getKey(), invalid.getValue()))
+            ).respCode()).as("create " + invalid.getKey()).isEqualTo("2003");
+
+            TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
+            assertThat(client.call(
+                "CNAPS5701U",
+                request(Map.of("BILL_ID", created.fields().get("BILL_ID"), invalid.getKey(), invalid.getValue()))
+            ).respCode()).as("update " + invalid.getKey()).isEqualTo("2003");
+        }
+    }
+
+    @Test
+    void bankKeywordMatchesBankNumberAsWellAsName() {
+        assertThat(records(page(client.call(
+            "BANKQRY",
+            request(Map.of("KEYWORD", "290000"))
+        )))).extracting(record -> record.get("BANK_NO")).containsExactly("102290000002");
+    }
+
+    @Test
+    void reviewReturnPreservesOptionalReviewComment() {
+        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
+
+        TuxedoResponse returned = client.call(
+            "CNAPS5702R",
+            request(Map.of(
+                "BILL_ID", created.fields().get("BILL_ID"),
+                "REJECT_REASON", "资料不完整",
+                "REVIEW_COMMENT", "请补全附件"
+            ))
+        );
+
+        assertThat(returned.fields())
+            .containsEntry("REJECT_REASON", "资料不完整")
+            .containsEntry("REVIEW_COMMENT", "请补全附件");
+    }
+
     private TuxedoRequest request(Map<String, ?> overrides) {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("REQ_ID", "REQ-POC");

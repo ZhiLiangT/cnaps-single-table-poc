@@ -2,6 +2,8 @@ package com.ruisui.cnaps.web.support;
 
 import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -43,6 +45,18 @@ public final class RequestSupport {
         Object workDate = fields.get("workDate");
         if (workDate == null || String.valueOf(workDate).isBlank()) {
             fields.put("workDate", LocalDate.now().toString());
+        }
+    }
+
+    public static boolean isValidWorkDate(String value) {
+        if (value == null || !value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
+            return false;
+        }
+        try {
+            LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
+            return true;
+        } catch (DateTimeParseException ex) {
+            return false;
         }
     }
 }

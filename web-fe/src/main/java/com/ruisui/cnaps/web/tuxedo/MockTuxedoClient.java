@@ -1,14 +1,15 @@
 package com.ruisui.cnaps.web.tuxedo;
 
+import com.ruisui.cnaps.web.support.RequestSupport;
+
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -61,6 +62,15 @@ public class MockTuxedoClient implements TuxedoClient {
         ),
         "SYSTEM_TYPE", List.of(dictItem("SYSTEM_TYPE", "CNAPS", "CNAPS", 1))
     );
+    private static final Map<String, Set<String>> DICTIONARY_VALUES = Map.of(
+        "BUSINESS_TYPE", Set.of("02102"),
+        "PRIORITY", Set.of("NORM"),
+        "SYSTEM_TYPE", Set.of("CNAPS"),
+        "DEBIT_MODE", Set.of("1"),
+        "FEE_CHARGE_MODE", Set.of("1"),
+        "SEND_MODE", Set.of("0"),
+        "FAX_FLAG", Set.of("0", "1")
+    );
     private static final List<Map<String, Object>> BANKS = List.of(Map.of(
         "BANK_NO", "102290000002",
         "BANK_NAME", "接收行名称",
@@ -73,6 +83,13 @@ public class MockTuxedoClient implements TuxedoClient {
 
     @Override
     public TuxedoResponse call(String serviceName, TuxedoRequest request) {
+        if (("CNAPS4609Q".equals(serviceName) || "CNAPS5702Q".equals(serviceName))
+            && request.fields().containsKey("WORK_DATE")) {
+            String workDate = text(request, "WORK_DATE");
+            if (workDate != null && !workDate.isBlank() && !validWorkDate(workDate)) {
+                return TuxedoResponse.fail("2002", "工作日期格式错误");
+            }
+        }
         return switch (serviceName) {
             case "SYSHEALTH" -> ok("健康检查成功", health());
             case "DICTQRY" -> dictQuery(request);
@@ -210,7 +227,7 @@ public class MockTuxedoClient implements TuxedoClient {
         setOptional(voucher, "CHECKER_NO", text(request, "OPERATOR_NO"));
         voucher.put("CHECKER_TIME", now());
         voucher.put("REJECT_REASON", rejectReason);
-        voucher.remove("REVIEW_COMMENT");
+        setOptional(voucher, "REVIEW_COMMENT", text(request, "REVIEW_COMMENT"));
         voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
         touch(voucher, request);
         return ok("复核退回成功", voucher);
@@ -254,7 +271,11 @@ public class MockTuxedoClient implements TuxedoClient {
         int pageSize = pageSize(request);
         List<Map<String, Object>> matching = BANKS.stream()
             .filter(bank -> matches(bank, "BANK_NO", text(request, "BANK_NO"), false))
-            .filter(bank -> matches(bank, "BANK_NAME", text(request, "KEYWORD"), true))
+            .filter(bank -> {
+                String keyword = text(request, "KEYWORD");
+                return matches(bank, "BANK_NAME", keyword, true)
+                    || matches(bank, "BANK_NO", keyword, true);
+            })
             .filter(bank -> matches(bank, "CITY", text(request, "CITY"), false))
             .filter(bank -> matches(bank, "SYSTEM_TYPE", text(request, "SYSTEM_TYPE"), false))
             .map(bank -> (Map<String, Object>) new LinkedHashMap<>(bank))
@@ -306,7 +327,7 @@ public class MockTuxedoClient implements TuxedoClient {
         if (!validMoney(text(request, "AMOUNT"), false) || !validMoney(text(request, "FEE_AMOUNT", "0.00"), true)) {
             return TuxedoResponse.fail("2002", "金额格式错误");
         }
-        return null;
+        return validateDictionaryFields(request);
     }
 
     private TuxedoResponse validateUpdate(TuxedoRequest request) {
@@ -318,6 +339,16 @@ public class MockTuxedoClient implements TuxedoClient {
         }
         if (request.fields().containsKey("WORK_DATE") && !validWorkDate(text(request, "WORK_DATE"))) {
             return TuxedoResponse.fail("2002", "工作日期格式错误");
+        }
+        return validateDictionaryFields(request);
+    }
+
+    private TuxedoResponse validateDictionaryFields(TuxedoRequest request) {
+        for (Map.Entry<String, Set<String>> dictionary : DICTIONARY_VALUES.entrySet()) {
+            if (request.fields().containsKey(dictionary.getKey())
+                && !dictionary.getValue().contains(text(request, dictionary.getKey()))) {
+                return TuxedoResponse.fail("2003", "字典值不存在：" + dictionary.getKey());
+            }
         }
         return null;
     }
@@ -335,15 +366,7 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private boolean validWorkDate(String value) {
-        if (value == null || !value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
-            return false;
-        }
-        try {
-            LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
-            return true;
-        } catch (DateTimeParseException ex) {
-            return false;
-        }
+        return RequestSupport.isValidWorkDate(value);
     }
 
     private void touch(Map<String, Object> voucher, TuxedoRequest request) {

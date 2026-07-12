@@ -1,5 +1,6 @@
 package com.ruisui.cnaps.web.servlet;
 
+import com.ruisui.cnaps.web.dto.ApiResponse;
 import com.ruisui.cnaps.web.support.JsonSupport;
 import com.ruisui.cnaps.web.support.RequestSupport;
 import com.ruisui.cnaps.web.tuxedo.TuxedoClient;
@@ -17,6 +18,17 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
         Map<String, Object> fields = new LinkedHashMap<>(RequestSupport.queryParams(request));
         String apiPath = RequestSupport.apiPath(request);
         if ("/api/cnaps/vouchers".equals(apiPath) || "/api/cnaps/vouchers/review-list".equals(apiPath)) {
+            Object explicitWorkDate = fields.get("workDate");
+            if (explicitWorkDate != null
+                && !String.valueOf(explicitWorkDate).isBlank()
+                && !RequestSupport.isValidWorkDate(String.valueOf(explicitWorkDate))) {
+                JsonSupport.write(
+                    response,
+                    HttpServletResponse.SC_BAD_REQUEST,
+                    ApiResponse.fail("2002", "工作日期格式错误")
+                );
+                return;
+            }
             RequestSupport.includeDefaultWorkDate(fields);
         }
         RequestSupport.includeBillPath(fields, request.getPathInfo());

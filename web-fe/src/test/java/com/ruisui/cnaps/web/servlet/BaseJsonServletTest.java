@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -120,6 +121,31 @@ class BaseJsonServletTest {
         assertThat(captured.get().fields()).doesNotContainKey("WORK_DATE");
     }
 
+    @Test
+    void rejectsInvalidExplicitCollectionWorkDateWithoutCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        for (Map.Entry<String, String> testCase : Map.of(
+            "/api/cnaps/vouchers", "2026/07/10",
+            "/api/cnaps/vouchers/review-list", "2026-02-30"
+        ).entrySet()) {
+            captured.set(null);
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            AtomicInteger status = new AtomicInteger();
+            servlet.doGet(
+                request(testCase.getKey(), null, Map.of("workDate", new String[] {testCase.getValue()})),
+                response(body, status)
+            );
+
+            assertThat(status.get()).as(testCase.getKey()).isEqualTo(400);
+            assertThat(body.toString(java.nio.charset.StandardCharsets.UTF_8))
+                .as(testCase.getKey())
+                .isEqualTo("{\"respCode\":\"2002\",\"respMsg\":\"工作日期格式错误\",\"data\":null}");
+            assertThat(captured.get()).as(testCase.getKey()).isNull();
+        }
+    }
+
     private CnapsVoucherServlet voucherServlet(AtomicReference<TuxedoRequest> captured) throws Exception {
         TuxedoClient client = (serviceName, request) -> {
             captured.set(request);
@@ -189,6 +215,10 @@ class BaseJsonServletTest {
     }
 
     private HttpServletResponse response(ByteArrayOutputStream body) {
+        return response(body, new AtomicInteger());
+    }
+
+    private HttpServletResponse response(ByteArrayOutputStream body, AtomicInteger status) {
         ServletOutputStream output = new ServletOutputStream() {
             @Override
             public void write(int value) {
@@ -204,9 +234,14 @@ class BaseJsonServletTest {
             public void setWriteListener(WriteListener writeListener) {
             }
         };
-        return proxy(HttpServletResponse.class, (method, args) ->
-            "getOutputStream".equals(method.getName()) ? output : defaultValue(method.getReturnType())
-        );
+        return proxy(HttpServletResponse.class, (method, args) -> switch (method.getName()) {
+            case "getOutputStream" -> output;
+            case "setStatus" -> {
+                status.set((Integer) args[0]);
+                yield null;
+            }
+            default -> defaultValue(method.getReturnType());
+        });
     }
 
     @SuppressWarnings("unchecked")

@@ -123,6 +123,18 @@ class MockTuxedoClientWorkDateTest {
             .containsExactly(matching.fields().get("BILL_ID"));
     }
 
+    @Test
+    void voucherQueriesRejectMalformedAndCalendarInvalidExplicitWorkDates() {
+        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+            assertThat(client.call(service, request(Map.of("WORK_DATE", "2026/07/10"))).respCode())
+                .as(service + " malformed")
+                .isEqualTo("2002");
+            assertThat(client.call(service, request(Map.of("WORK_DATE", "2026-02-30"))).respCode())
+                .as(service + " calendar invalid")
+                .isEqualTo("2002");
+        }
+    }
+
     private TuxedoResponse createVoucher(String workDate, String branchNo) {
         return client.call(
             "CNAPS5701E",

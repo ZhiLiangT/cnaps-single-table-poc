@@ -52,33 +52,26 @@ static int valid_money(const char *value, int zero_allowed)
     return zero_allowed || nonzero_seen;
 }
 
-static int valid_work_date(const char *value)
+static int invalid_dictionary_fields(
+    const cnaps_voucher_row *row,
+    int business_type_supplied,
+    int priority_supplied,
+    int system_type_supplied,
+    int debit_mode_supplied,
+    int fee_charge_mode_supplied,
+    int send_mode_supplied,
+    int fax_flag_supplied
+)
 {
-    static const int days_by_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    int year;
-    int month;
-    int day;
-    int max_day;
-
-    if (value == NULL || strlen(value) != 10 || value[4] != '-' || value[7] != '-') {
-        return 0;
-    }
-    for (int i = 0; i < 10; ++i) {
-        if (i != 4 && i != 7 && !isdigit((unsigned char)value[i])) {
-            return 0;
-        }
-    }
-    year = (value[0] - '0') * 1000 + (value[1] - '0') * 100 + (value[2] - '0') * 10 + value[3] - '0';
-    month = (value[5] - '0') * 10 + value[6] - '0';
-    day = (value[8] - '0') * 10 + value[9] - '0';
-    if (year == 0 || month < 1 || month > 12) {
-        return 0;
-    }
-    max_day = days_by_month[month - 1];
-    if (month == 2 && (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0))) {
-        max_day = 29;
-    }
-    return day >= 1 && day <= max_day;
+    return (business_type_supplied && strcmp(row->business_type, "02102") != 0)
+        || (priority_supplied && strcmp(row->priority, "NORM") != 0)
+        || (system_type_supplied && strcmp(row->system_type, "CNAPS") != 0)
+        || (debit_mode_supplied && strcmp(row->debit_mode, "1") != 0)
+        || (fee_charge_mode_supplied && strcmp(row->fee_charge_mode, "1") != 0)
+        || (send_mode_supplied && strcmp(row->send_mode, "0") != 0)
+        || (fax_flag_supplied
+            && strcmp(row->fax_flag, "0") != 0
+            && strcmp(row->fax_flag, "1") != 0);
 }
 
 void CNAPS5701U(TPSVCINFO *rqst)
@@ -91,6 +84,13 @@ void CNAPS5701U(TPSVCINFO *rqst)
     int work_date_supplied;
     int amount_supplied;
     int fee_amount_supplied;
+    int business_type_supplied;
+    int priority_supplied;
+    int system_type_supplied;
+    int debit_mode_supplied;
+    int fee_charge_mode_supplied;
+    int send_mode_supplied;
+    int fax_flag_supplied;
     int rc;
 
     cnaps_log_service_start("CNAPS5701U");
@@ -116,7 +116,7 @@ void CNAPS5701U(TPSVCINFO *rqst)
     }
 
     work_date_supplied = overlay_field(fbfr, CNAPS_F_WORK_DATE, row.work_date, sizeof(row.work_date));
-    overlay_field(fbfr, CNAPS_F_BUSINESS_TYPE, row.business_type, sizeof(row.business_type));
+    business_type_supplied = overlay_field(fbfr, CNAPS_F_BUSINESS_TYPE, row.business_type, sizeof(row.business_type));
     overlay_field(fbfr, CNAPS_F_ACCOUNT_PART1, row.account_part1, sizeof(row.account_part1));
     overlay_field(fbfr, CNAPS_F_ACCOUNT_PART2, row.account_part2, sizeof(row.account_part2));
     overlay_field(fbfr, CNAPS_F_ACCOUNT_PART3, row.account_part3, sizeof(row.account_part3));
@@ -124,26 +124,39 @@ void CNAPS5701U(TPSVCINFO *rqst)
     overlay_field(fbfr, CNAPS_F_PAYER_NAME, row.payer_name, sizeof(row.payer_name));
     overlay_field(fbfr, CNAPS_F_PAYEE_ACCT, row.payee_account_no, sizeof(row.payee_account_no));
     overlay_field(fbfr, CNAPS_F_PAYEE_NAME, row.payee_name, sizeof(row.payee_name));
-    overlay_field(fbfr, CNAPS_F_PRIORITY, row.priority, sizeof(row.priority));
+    priority_supplied = overlay_field(fbfr, CNAPS_F_PRIORITY, row.priority, sizeof(row.priority));
     overlay_field(fbfr, CNAPS_F_RECEIVE_BANK_NO, row.receive_bank_no, sizeof(row.receive_bank_no));
     overlay_field(fbfr, CNAPS_F_RECEIVE_BANK_NAME, row.receive_bank_name, sizeof(row.receive_bank_name));
-    overlay_field(fbfr, CNAPS_F_SYSTEM_TYPE, row.system_type, sizeof(row.system_type));
+    system_type_supplied = overlay_field(fbfr, CNAPS_F_SYSTEM_TYPE, row.system_type, sizeof(row.system_type));
     amount_supplied = overlay_field(fbfr, CNAPS_F_AMOUNT, row.amount, sizeof(row.amount));
-    overlay_field(fbfr, CNAPS_F_DEBIT_MODE, row.debit_mode, sizeof(row.debit_mode));
+    debit_mode_supplied = overlay_field(fbfr, CNAPS_F_DEBIT_MODE, row.debit_mode, sizeof(row.debit_mode));
     fee_amount_supplied = overlay_field(fbfr, CNAPS_F_FEE_AMOUNT, row.fee_amount, sizeof(row.fee_amount));
-    overlay_field(fbfr, CNAPS_F_FEE_CHARGE_MODE, row.fee_charge_mode, sizeof(row.fee_charge_mode));
-    overlay_field(fbfr, CNAPS_F_SEND_MODE, row.send_mode, sizeof(row.send_mode));
-    overlay_field(fbfr, CNAPS_F_FAX_FLAG, row.fax_flag, sizeof(row.fax_flag));
+    fee_charge_mode_supplied = overlay_field(fbfr, CNAPS_F_FEE_CHARGE_MODE, row.fee_charge_mode, sizeof(row.fee_charge_mode));
+    send_mode_supplied = overlay_field(fbfr, CNAPS_F_SEND_MODE, row.send_mode, sizeof(row.send_mode));
+    fax_flag_supplied = overlay_field(fbfr, CNAPS_F_FAX_FLAG, row.fax_flag, sizeof(row.fax_flag));
     overlay_field(fbfr, CNAPS_F_VOUCHER_NO, row.voucher_no, sizeof(row.voucher_no));
     overlay_field(fbfr, CNAPS_F_REMARK, row.remark, sizeof(row.remark));
 
-    if (work_date_supplied && !valid_work_date(row.work_date)) {
+    if (work_date_supplied && !cnaps_valid_work_date(row.work_date)) {
         cnaps_return_error(rqst, "2002", "invalid work date");
         return;
     }
     if ((amount_supplied && !valid_money(row.amount, 0))
         || (fee_amount_supplied && !valid_money(row.fee_amount, 1))) {
         cnaps_return_error(rqst, "2002", "invalid money");
+        return;
+    }
+    if (invalid_dictionary_fields(
+        &row,
+        business_type_supplied,
+        priority_supplied,
+        system_type_supplied,
+        debit_mode_supplied,
+        fee_charge_mode_supplied,
+        send_mode_supplied,
+        fax_flag_supplied
+    )) {
+        cnaps_return_error(rqst, "2003", "invalid dictionary value");
         return;
     }
 

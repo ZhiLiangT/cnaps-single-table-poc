@@ -18,5 +18,6 @@ void cnaps_return_response(TPSVCINFO *rqst, int success, const char *resp_code, 
 void cnaps_return_ok(TPSVCINFO *rqst, const char *service_name);
 void cnaps_return_error(TPSVCINFO *rqst, const char *resp_code, const char *resp_msg);
 void cnaps_log_service_start(const char *service_name);
+int cnaps_valid_work_date(const char *value);
 
 #endif

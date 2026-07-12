@@ -40,35 +40,6 @@ static int is_blank(const char *value)
     return 1;
 }
 
-static int valid_work_date(const char *value)
-{
-    static const int days_by_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    int year;
-    int month;
-    int day;
-    int max_day;
-
-    if (value == NULL || strlen(value) != 10 || value[4] != '-' || value[7] != '-') {
-        return 0;
-    }
-    for (int i = 0; i < 10; ++i) {
-        if (i != 4 && i != 7 && !isdigit((unsigned char)value[i])) {
-            return 0;
-        }
-    }
-    year = (value[0] - '0') * 1000 + (value[1] - '0') * 100 + (value[2] - '0') * 10 + value[3] - '0';
-    month = (value[5] - '0') * 10 + value[6] - '0';
-    day = (value[8] - '0') * 10 + value[9] - '0';
-    if (year == 0 || month < 1 || month > 12) {
-        return 0;
-    }
-    max_day = days_by_month[month - 1];
-    if (month == 2 && (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0))) {
-        max_day = 29;
-    }
-    return day >= 1 && day <= max_day;
-}
-
 static int valid_money(const char *value, int zero_allowed)
 {
     int decimal_seen = 0;
@@ -112,13 +83,34 @@ static int required_field_missing(const cnaps_voucher_row *row)
         || is_blank(row->amount);
 }
 
+static int invalid_dictionary_fields(const cnaps_voucher_row *row)
+{
+    return strcmp(row->business_type, "02102") != 0
+        || strcmp(row->priority, "NORM") != 0
+        || strcmp(row->system_type, "CNAPS") != 0
+        || (row->debit_mode[0] != '\0' && strcmp(row->debit_mode, "1") != 0)
+        || (row->fee_charge_mode[0] != '\0' && strcmp(row->fee_charge_mode, "1") != 0)
+        || (row->send_mode[0] != '\0' && strcmp(row->send_mode, "0") != 0)
+        || (row->fax_flag[0] != '\0'
+            && strcmp(row->fax_flag, "0") != 0
+            && strcmp(row->fax_flag, "1") != 0);
+}
+
+static void apply_optional_defaults(cnaps_voucher_row *row)
+{
+    if (row->debit_mode[0] == '\0') snprintf(row->debit_mode, sizeof(row->debit_mode), "%s", "1");
+    if (row->fee_charge_mode[0] == '\0') snprintf(row->fee_charge_mode, sizeof(row->fee_charge_mode), "%s", "1");
+    if (row->send_mode[0] == '\0') snprintf(row->send_mode, sizeof(row->send_mode), "%s", "0");
+    if (row->fax_flag[0] == '\0') snprintf(row->fax_flag, sizeof(row->fax_flag), "%s", "0");
+}
+
 static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row)
 {
     memset(row, 0, sizeof(*row));
     copy_text(fbfr, CNAPS_F_WORK_DATE, row->work_date, sizeof(row->work_date), "");
     copy_text(fbfr, CNAPS_F_BRANCH_NO, row->branch_no, sizeof(row->branch_no), "772");
     copy_text(fbfr, CNAPS_F_OPERATOR_NO, row->operator_no, sizeof(row->operator_no), "");
-    copy_text(fbfr, CNAPS_F_BUSINESS_TYPE, row->business_type, sizeof(row->business_type), "02102");
+    copy_text(fbfr, CNAPS_F_BUSINESS_TYPE, row->business_type, sizeof(row->business_type), "");
     copy_text(fbfr, CNAPS_F_ACCOUNT_PART1, row->account_part1, sizeof(row->account_part1), "");
     copy_text(fbfr, CNAPS_F_ACCOUNT_PART2, row->account_part2, sizeof(row->account_part2), "");
     copy_text(fbfr, CNAPS_F_ACCOUNT_PART3, row->account_part3, sizeof(row->account_part3), "");
@@ -126,16 +118,16 @@ static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row)
     copy_text(fbfr, CNAPS_F_PAYER_NAME, row->payer_name, sizeof(row->payer_name), "");
     copy_text(fbfr, CNAPS_F_PAYEE_ACCT, row->payee_account_no, sizeof(row->payee_account_no), "");
     copy_text(fbfr, CNAPS_F_PAYEE_NAME, row->payee_name, sizeof(row->payee_name), "");
-    copy_text(fbfr, CNAPS_F_PRIORITY, row->priority, sizeof(row->priority), "NORM");
+    copy_text(fbfr, CNAPS_F_PRIORITY, row->priority, sizeof(row->priority), "");
     copy_text(fbfr, CNAPS_F_RECEIVE_BANK_NO, row->receive_bank_no, sizeof(row->receive_bank_no), "");
     copy_text(fbfr, CNAPS_F_RECEIVE_BANK_NAME, row->receive_bank_name, sizeof(row->receive_bank_name), "");
-    copy_text(fbfr, CNAPS_F_SYSTEM_TYPE, row->system_type, sizeof(row->system_type), "CNAPS");
+    copy_text(fbfr, CNAPS_F_SYSTEM_TYPE, row->system_type, sizeof(row->system_type), "");
     copy_text(fbfr, CNAPS_F_AMOUNT, row->amount, sizeof(row->amount), "");
-    copy_text(fbfr, CNAPS_F_DEBIT_MODE, row->debit_mode, sizeof(row->debit_mode), "1");
+    copy_text(fbfr, CNAPS_F_DEBIT_MODE, row->debit_mode, sizeof(row->debit_mode), "");
     copy_text(fbfr, CNAPS_F_FEE_AMOUNT, row->fee_amount, sizeof(row->fee_amount), "0");
-    copy_text(fbfr, CNAPS_F_FEE_CHARGE_MODE, row->fee_charge_mode, sizeof(row->fee_charge_mode), "1");
-    copy_text(fbfr, CNAPS_F_SEND_MODE, row->send_mode, sizeof(row->send_mode), "0");
-    copy_text(fbfr, CNAPS_F_FAX_FLAG, row->fax_flag, sizeof(row->fax_flag), "0");
+    copy_text(fbfr, CNAPS_F_FEE_CHARGE_MODE, row->fee_charge_mode, sizeof(row->fee_charge_mode), "");
+    copy_text(fbfr, CNAPS_F_SEND_MODE, row->send_mode, sizeof(row->send_mode), "");
+    copy_text(fbfr, CNAPS_F_FAX_FLAG, row->fax_flag, sizeof(row->fax_flag), "");
     copy_text(fbfr, CNAPS_F_VOUCHER_NO, row->voucher_no, sizeof(row->voucher_no), "");
     copy_text(fbfr, CNAPS_F_REMARK, row->remark, sizeof(row->remark), "");
     copy_text(fbfr, CNAPS_F_REQ_ID, row->last_request_id, sizeof(row->last_request_id), "");
@@ -168,7 +160,7 @@ void CNAPS5701E(TPSVCINFO *rqst)
         cnaps_return_error(rqst, "2001", "required field missing");
         return;
     }
-    if (!valid_work_date(row.work_date)) {
+    if (!cnaps_valid_work_date(row.work_date)) {
         cnaps_return_error(rqst, "2002", "invalid work date");
         return;
     }
@@ -176,6 +168,11 @@ void CNAPS5701E(TPSVCINFO *rqst)
         cnaps_return_error(rqst, "2002", "invalid money");
         return;
     }
+    if (invalid_dictionary_fields(&row)) {
+        cnaps_return_error(rqst, "2003", "invalid dictionary value");
+        return;
+    }
+    apply_optional_defaults(&row);
     generate_identifiers(&row);
     snprintf(bill_id, sizeof(bill_id), "%s", row.bill_id);
     if (db_begin() != 0

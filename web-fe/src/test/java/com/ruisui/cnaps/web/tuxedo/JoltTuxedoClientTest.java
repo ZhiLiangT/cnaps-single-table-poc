@@ -1,5 +1,6 @@
 package com.ruisui.cnaps.web.tuxedo;
 
+import bea.jolt.JoltSessionAttributes;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -8,6 +9,35 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JoltTuxedoClientTest {
+    @Test
+    void convertsConfiguredMillisecondTimeoutToCeilingJoltSeconds() {
+        JoltSessionAttributes.reset();
+        new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"))
+            .call("SYSHEALTH", new TuxedoRequest(Map.of()));
+        assertThat(JoltSessionAttributes.lastReceiveTimeout()).isEqualTo(30);
+
+        JoltSessionAttributes.reset();
+        TuxedoRuntimeConfig subSecond = new TuxedoRuntimeConfig(
+            "jolt", "77210021", "772", "/opt/ruisui-bank-sim", "//127.0.0.1:8000",
+            1, null, null, null, null
+        );
+        new JoltTuxedoClient(subSecond).call("SYSHEALTH", new TuxedoRequest(Map.of()));
+        assertThat(JoltSessionAttributes.lastReceiveTimeout()).isEqualTo(1);
+    }
+
+    @Test
+    void convertsMaximumPositiveMillisecondTimeoutWithoutIntegerOverflow() {
+        JoltSessionAttributes.reset();
+        TuxedoRuntimeConfig maximum = new TuxedoRuntimeConfig(
+            "jolt", "77210021", "772", "/opt/ruisui-bank-sim", "//127.0.0.1:8000",
+            Integer.MAX_VALUE, null, null, null, null
+        );
+
+        new JoltTuxedoClient(maximum).call("SYSHEALTH", new TuxedoRequest(Map.of()));
+
+        assertThat(JoltSessionAttributes.lastReceiveTimeout()).isEqualTo(2_147_484);
+    }
+
     @Test
     void extractsWorkDateFromJoltResponse() throws Exception {
         JoltTuxedoClient client = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"));

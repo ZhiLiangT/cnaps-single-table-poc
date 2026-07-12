@@ -81,11 +81,10 @@ static void review_voucher(
     snprintf(row.status, sizeof(row.status), "%s", target_status);
     snprintf(row.last_action, sizeof(row.last_action), "%s", action);
     row.checker_time[0] = '\0';
+    snprintf(row.review_comment, sizeof(row.review_comment), "%s", review_comment);
     if (reject_required) {
         snprintf(row.reject_reason, sizeof(row.reject_reason), "%s", reject_reason);
-        row.review_comment[0] = '\0';
     } else {
-        snprintf(row.review_comment, sizeof(row.review_comment), "%s", review_comment);
         row.reject_reason[0] = '\0';
     }
 

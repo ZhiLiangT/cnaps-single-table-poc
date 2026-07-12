@@ -68,7 +68,8 @@ public class JoltTuxedoClient implements TuxedoClient {
 
             Object attributes = attributesClass.getConstructor().newInstance();
             setJoltAttribute(attributesClass, attributes, "APPADDRESS", config.joltListen());
-            setJoltAttribute(attributesClass, attributes, "RECVTIMEOUT", String.valueOf(config.joltTimeoutMillis()));
+            int receiveTimeoutSeconds = (int)Math.max(1L, (config.joltTimeoutMillis() + 999L) / 1_000L);
+            setJoltAttribute(attributesClass, attributes, "RECVTIMEOUT", String.valueOf(receiveTimeoutSeconds));
 
             session = sessionClass
                 .getConstructor(attributesClass, String.class, String.class, String.class, String.class)

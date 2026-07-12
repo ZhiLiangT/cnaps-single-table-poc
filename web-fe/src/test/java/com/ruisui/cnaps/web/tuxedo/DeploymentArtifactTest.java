@@ -143,6 +143,36 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void singleVoucherServicesTransportCompleteInputsAndVoucherOutputsWithoutOccurrences() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+        String[] mutableFields = {
+            "WORK_DATE", "BUSINESS_TYPE", "ACCOUNT_PART1", "ACCOUNT_PART2", "ACCOUNT_PART3",
+            "ACCOUNT_NAME", "PAYER_NAME", "PAYEE_ACCT", "PAYEE_NAME", "PRIORITY",
+            "RECEIVE_BANK_NO", "RECEIVE_BANK_NAME", "SYSTEM_TYPE", "AMOUNT", "DEBIT_MODE",
+            "FEE_AMOUNT", "FEE_CHARGE_MODE", "SEND_MODE", "FAX_FLAG", "VOUCHER_NO", "REMARK"
+        };
+
+        for (String service : new String[] {
+            "CNAPS5701E", "CNAPS5701U", "CNAPS5701D", "CNAPS5702I", "CNAPS5702A", "CNAPS5702R"
+        }) {
+            assertScalarParam(metadata, service, "REQUEST_ID", "string", "inout");
+            assertScalarParam(metadata, service, "REQ_ID", "string", "inout");
+            assertScalarParam(metadata, service, "OPERATOR_NO", "string", "inout");
+            assertScalarParam(metadata, service, "BRANCH_NO", "string", "inout");
+            for (String field : VOUCHER_RECORD_FIELDS) {
+                String type = "VERSION_NO".equals(field) ? "long" : "string";
+                String access = expectedSingleVoucherAccess(service, field, mutableFields);
+                assertScalarParam(metadata, service, field, type, access);
+            }
+        }
+
+        assertScalarParam(metadata, "CNAPS5701D", "DELETE_REASON", "string", "inout");
+        assertScalarParam(metadata, "CNAPS5702A", "REVIEW_COMMENT", "string", "inout");
+        assertScalarParam(metadata, "CNAPS5702R", "REJECT_REASON", "string", "inout");
+        assertScalarParam(metadata, "CNAPS5702R", "REVIEW_COMMENT", "string", "inout");
+    }
+
+    @Test
     void pageRequestAndEnvelopeMetadataRemainScalarAndErrorsUseOuterr() throws Exception {
         String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
 
@@ -371,5 +401,29 @@ class DeploymentArtifactTest {
         assertThat(paramMetadata(metadata, serviceName, paramName))
             .contains("type=" + type + "\n", "access=" + access + "\n")
             .doesNotContain("count=");
+    }
+
+    private String expectedSingleVoucherAccess(String service, String field, String[] mutableFields) {
+        if ("BILL_ID".equals(field)) {
+            return "CNAPS5701E".equals(service) ? "out" : "inout";
+        }
+        if ("OPERATOR_NO".equals(field) || "BRANCH_NO".equals(field)) {
+            return "inout";
+        }
+        if (("CNAPS5701E".equals(service) || "CNAPS5701U".equals(service))
+            && List.of(mutableFields).contains(field)) {
+            return "inout";
+        }
+        if ("CNAPS5701D".equals(service) && "DELETE_REASON".equals(field)) {
+            return "inout";
+        }
+        if (("CNAPS5702A".equals(service) || "CNAPS5702R".equals(service))
+            && "REVIEW_COMMENT".equals(field)) {
+            return "inout";
+        }
+        if ("CNAPS5702R".equals(service) && "REJECT_REASON".equals(field)) {
+            return "inout";
+        }
+        return "out";
     }
 }

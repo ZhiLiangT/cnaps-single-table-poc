@@ -201,4 +201,59 @@ class TuxedoCSourceContractTest {
             "CNAPS_F_TOTAL_ELEMENTS"
         );
     }
+
+    @Test
+    void nativeCreateAndUpdateValidateRequiredAndSuppliedDictionaryValues() throws Exception {
+        String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
+        String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
+
+        assertThat(create)
+            .contains(
+                "row->business_type, sizeof(row->business_type), \"\"",
+                "row->priority, sizeof(row->priority), \"\"",
+                "row->system_type, sizeof(row->system_type), \"\"",
+                "invalid_dictionary_fields(&row)", "2003",
+                "02102", "NORM", "CNAPS", "debit_mode", "fee_charge_mode", "send_mode", "fax_flag"
+            )
+            .doesNotContain(
+                "row->business_type, sizeof(row->business_type), \"02102\"",
+                "row->priority, sizeof(row->priority), \"NORM\"",
+                "row->system_type, sizeof(row->system_type), \"CNAPS\""
+            );
+        assertThat(update).contains(
+            "business_type_supplied", "priority_supplied", "system_type_supplied",
+            "debit_mode_supplied", "fee_charge_mode_supplied", "send_mode_supplied",
+            "fax_flag_supplied", "invalid_dictionary_fields", "2003",
+            "02102", "NORM", "CNAPS"
+        );
+    }
+
+    @Test
+    void nativeQueriesStrictlyValidateWorkDateBeforeDatabaseAccess() throws Exception {
+        String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_service.h"));
+        String validation = Files.readString(root.resolve("tuxedo-server/src/common/validation_helper.c"));
+        String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
+
+        assertThat(header).contains("int cnaps_valid_work_date(const char *value);");
+        assertThat(validation).contains("cnaps_valid_work_date", "days_by_month", "year % 400");
+        assertThat(query).contains(
+            "work_date[0] != '\\0' && !cnaps_valid_work_date(work_date)",
+            "cnaps_return_error(rqst, \"2002\", \"invalid work date\")"
+        );
+        assertThat(query.indexOf("cnaps_valid_work_date(work_date)"))
+            .isLessThan(query.indexOf("db_query_vouchers("));
+    }
+
+    @Test
+    void nativeBankKeywordMatchesNumberAndReviewReturnKeepsComment() throws Exception {
+        String bank = Files.readString(root.resolve("tuxedo-server/src/services/bank_query.c"));
+        String review = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_review.c"));
+
+        assertThat(bank).contains(
+            "strstr(bank_name, keyword) != NULL || strstr(bank_no, keyword) != NULL"
+        );
+        assertThat(review)
+            .contains("snprintf(row.review_comment, sizeof(row.review_comment), \"%s\", review_comment)")
+            .doesNotContain("row.review_comment[0] = '\\0';");
+    }
 }

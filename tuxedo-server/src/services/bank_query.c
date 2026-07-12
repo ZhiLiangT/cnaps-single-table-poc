@@ -31,7 +31,8 @@ void BANKQRY(TPSVCINFO *rqst)
     if (page_size > BANK_QUERY_MAX_PAGE_SIZE) page_size = BANK_QUERY_MAX_PAGE_SIZE;
 
     matches = (bank_no_filter[0] == '\0' || strcmp(bank_no_filter, bank_no) == 0)
-        && (keyword[0] == '\0' || strstr(bank_name, keyword) != NULL)
+        && (keyword[0] == '\0'
+            || strstr(bank_name, keyword) != NULL || strstr(bank_no, keyword) != NULL)
         && (city_filter[0] == '\0' || strcmp(city_filter, city) == 0)
         && (system_type_filter[0] == '\0' || strcmp(system_type_filter, system_type) == 0);
 

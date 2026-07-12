@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -243,6 +245,60 @@ class DeploymentArtifactTest {
             "-H \"branchNo:",
             "-H \"workDate:"
         );
+
+        assertThat(api).contains(
+            "| `GET /api/health` | `SYSHEALTH` |",
+            "| `GET /api/dicts/{dictType}` | `DICTQRY` |",
+            "| `GET /api/banks` | `BANKQRY` |",
+            "| `POST /api/cnaps/vouchers` | `CNAPS5701E` |",
+            "| `PUT /api/cnaps/vouchers/{billId}` | `CNAPS5701U` |",
+            "| `POST /api/cnaps/vouchers/{billId}/delete` | `CNAPS5701D` |",
+            "| `GET /api/cnaps/vouchers` | `CNAPS4609Q` |",
+            "| `GET /api/cnaps/vouchers/review-list` | `CNAPS5702Q` |",
+            "| `GET /api/cnaps/vouchers/{billId}` | `CNAPS5702I` |",
+            "| `POST /api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` |",
+            "| `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` |"
+        );
+
+        assertThat(Pattern.compile("(?m)^### 4\\.\\d+ ").matcher(api).results()).hasSize(11);
+        assertThat(countOccurrences(api, "-H \"Content-Type: application/json; charset=UTF-8\"")).isEqualTo(5);
+
+        String errorCodeTable = api.substring(api.indexOf("## 6. 错误码"), api.indexOf("失败示例："));
+        List<String> activeErrorCodes = Pattern.compile("(?m)^\\| `(\\d{4})` \\|")
+            .matcher(errorCodeTable)
+            .results()
+            .map(result -> result.group(1))
+            .toList();
+        assertThat(activeErrorCodes).containsExactly(
+            "0000", "2001", "2002", "2003", "3001", "3003", "3004",
+            "4001", "4002", "4003", "9999"
+        );
+    }
+
+    @Test
+    void smokeCreatePayloadContainsEveryMandatoryVoucherField() throws Exception {
+        String smoke = Files.readString(root.resolve("scripts/smoke-test.sh"));
+        int createStart = smoke.indexOf("create_response=$(curl");
+        int createEnd = smoke.indexOf("echo \"$create_response\"", createStart);
+        String createRequest = smoke.substring(createStart, createEnd);
+
+        assertThat(createRequest).contains(
+            "\\\"workDate\\\"",
+            "\\\"businessType\\\"",
+            "\\\"accountPart1\\\"",
+            "\\\"accountPart2\\\"",
+            "\\\"accountPart3\\\"",
+            "\\\"payeeAccountNo\\\"",
+            "\\\"payeeName\\\"",
+            "\\\"priority\\\"",
+            "\\\"systemType\\\"",
+            "\\\"amount\\\""
+        ).doesNotContain(
+            "-H \"requestId:",
+            "-H \"operatorNo:",
+            "-H \"branchNo:",
+            "-H \"workDate:"
+        );
     }
 
     @Test
@@ -274,6 +330,10 @@ class DeploymentArtifactTest {
 
     private String normalizeLineEndings(String value) {
         return value.replace("\r\n", "\n");
+    }
+
+    private int countOccurrences(String value, String token) {
+        return (value.length() - value.replace(token, "").length()) / token.length();
     }
 
     private String serviceMetadata(String metadata, String serviceName) {

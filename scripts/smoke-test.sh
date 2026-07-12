@@ -12,9 +12,13 @@ create_response=$(curl -fsS -X POST "$BASE_URL/api/cnaps/vouchers" \
   -d "{
     \"workDate\":\"$WORK_DATE\",
     \"businessType\":\"02102\",
+    \"accountPart1\":\"404045\",
+    \"accountPart2\":\"00772\",
+    \"accountPart3\":\"000000000001\",
     \"payeeAccountNo\":\"622200000000000001\",
     \"payeeName\":\"收款人名称\",
     \"priority\":\"NORM\",
+    \"systemType\":\"CNAPS\",
     \"amount\":\"5600.00\",
     \"remark\":\"无请求头CRUD验证\"
   }")

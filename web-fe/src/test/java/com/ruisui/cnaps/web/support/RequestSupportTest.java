@@ -53,13 +53,13 @@ class RequestSupportTest {
     }
 
     @Test
-    void acceptsBlankWorkDateFiltersWithoutAddingDefaults() {
+    void removesBlankWorkDateFiltersWithoutAddingDefaults() {
         Map<String, Object> fields = new LinkedHashMap<>(Map.of("workDate", "  "));
 
         String error = RequestSupport.validateWorkDateFilter(fields);
 
         assertThat(error).isNull();
-        assertThat(fields).containsEntry("workDate", "  ");
+        assertThat(fields).isEmpty();
     }
 
     @Test

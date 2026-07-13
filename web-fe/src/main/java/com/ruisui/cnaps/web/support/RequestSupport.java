@@ -42,6 +42,9 @@ public final class RequestSupport {
     }
 
     public static String validateWorkDateFilter(Map<String, Object> fields) {
+        removeBlank(fields, "workDate");
+        removeBlank(fields, "startWorkDate");
+        removeBlank(fields, "endWorkDate");
         String workDate = text(fields.get("workDate"));
         String startWorkDate = text(fields.get("startWorkDate"));
         String endWorkDate = text(fields.get("endWorkDate"));
@@ -82,5 +85,12 @@ public final class RequestSupport {
 
     private static boolean isValidOptionalWorkDate(String value) {
         return value == null || isValidWorkDate(value);
+    }
+
+    private static void removeBlank(Map<String, Object> fields, String key) {
+        Object value = fields.get(key);
+        if (value != null && String.valueOf(value).isBlank()) {
+            fields.remove(key);
+        }
     }
 }

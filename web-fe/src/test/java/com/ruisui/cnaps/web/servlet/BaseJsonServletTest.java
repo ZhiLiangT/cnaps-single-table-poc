@@ -104,6 +104,24 @@ class BaseJsonServletTest {
     }
 
     @Test
+    void removesBlankWorkDateFiltersBeforeCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        servlet.doGet(
+            request("/api/cnaps/vouchers", null, Map.of(
+                "workDate", new String[] {" "},
+                "startWorkDate", new String[] {""},
+                "endWorkDate", new String[] {"  "}
+            )),
+            response(new ByteArrayOutputStream())
+        );
+
+        assertThat(captured.get().fields())
+            .doesNotContainKeys("WORK_DATE", "START_WORK_DATE", "END_WORK_DATE");
+    }
+
+    @Test
     void preservesExplicitWorkDateForVoucherCollection() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);

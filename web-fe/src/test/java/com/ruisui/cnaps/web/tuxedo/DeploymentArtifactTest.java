@@ -288,7 +288,6 @@ class DeploymentArtifactTest {
                 "修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。")
             .doesNotContain(
                 "### 1.4 公共请求头",
-                "| `operatorNo`",
                 "-H \"requestId:",
                 "-H \"operatorNo:",
                 "-H \"branchNo:",
@@ -334,10 +333,10 @@ class DeploymentArtifactTest {
             "| `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` |"
         );
 
-        assertThat(Pattern.compile("(?m)^### 4\\.\\d+ ").matcher(api).results()).hasSize(11);
+        assertThat(Pattern.compile("(?m)^## 6\\.\\d+ ").matcher(api).results()).hasSize(11);
         assertThat(countOccurrences(api, "-H \"Content-Type: application/json; charset=UTF-8\"")).isEqualTo(5);
 
-        String errorCodeTable = api.substring(api.indexOf("## 6. 错误码"), api.indexOf("失败示例："));
+        String errorCodeTable = api.substring(api.indexOf("## 8. 错误码"), api.indexOf("错误响应示例："));
         List<String> activeErrorCodes = Pattern.compile("(?m)^\\| `(\\d{4})` \\|")
             .matcher(errorCodeTable)
             .results()
@@ -362,6 +361,60 @@ class DeploymentArtifactTest {
             "`payerAddress`", "`payeeAddress`", "`payerBankName`",
             "PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME",
             "040_add_party_address_bank_fields.sql"
+        );
+    }
+
+    @Test
+    void frontendApiUsesTheDetailedOriginalFormatForAllCurrentEndpoints() throws Exception {
+        String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
+
+        assertThat(api).contains(
+            "# 老式银行 Tuxedo 后端模拟系统 API 文档",
+            "文档版本：v0.4 单表 POC 版",
+            "编写日期：2026-07-13",
+            "## 1. 文档说明",
+            "## 2. 基础约定",
+            "## 3. 通用响应格式",
+            "## 4. 接口清单",
+            "## 5. 状态模型",
+            "## 6. API 详情",
+            "## 7. 单据完整字段说明",
+            "## 8. 错误码",
+            "## 9. 典型联调流程",
+            "## 10. POC 边界",
+            "### 基本信息",
+            "### 请求示例",
+            "### 成功响应示例",
+            "### 响应字段说明"
+        );
+
+        for (String endpoint : List.of(
+            "GET /api/health",
+            "GET /api/dicts/{dictType}",
+            "GET /api/banks",
+            "POST /api/cnaps/vouchers",
+            "PUT /api/cnaps/vouchers/{billId}",
+            "POST /api/cnaps/vouchers/{billId}/delete",
+            "GET /api/cnaps/vouchers",
+            "GET /api/cnaps/vouchers/review-list",
+            "GET /api/cnaps/vouchers/{billId}",
+            "POST /api/cnaps/vouchers/{billId}/review-pass",
+            "POST /api/cnaps/vouchers/{billId}/review-return"
+        )) {
+            assertThat(api).contains(endpoint);
+        }
+
+        assertThat(api).contains(
+            "`payerAddress`", "`payeeAddress`", "`payerBankName`",
+            "未传时保留原值", "空字符串", "pageNo", "pageSize", "records"
+        );
+        assertThat(api).doesNotContain(
+            "\"success\"",
+            "-H \"requestId:",
+            "-H \"operatorNo:",
+            "-H \"branchNo:",
+            "-H \"workDate:",
+            "?page=", "&size="
         );
     }
 

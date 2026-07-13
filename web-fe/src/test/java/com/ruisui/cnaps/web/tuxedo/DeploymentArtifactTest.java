@@ -99,6 +99,17 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void voucherListMetadataUsesRangeOnlyWorkDateInputs() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+
+        for (String service : new String[] {"CNAPS4609Q", "CNAPS5702Q"}) {
+            assertScalarParam(metadata, service, "START_WORK_DATE", "string", "in");
+            assertScalarParam(metadata, service, "END_WORK_DATE", "string", "in");
+            assertRepeatedParam(metadata, service, "WORK_DATE", "string", "out");
+        }
+    }
+
+    @Test
     void referenceMetadataExposesDictionaryArraysAndBankPages() throws Exception {
         String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
 
@@ -130,11 +141,11 @@ class DeploymentArtifactTest {
         for (String field : VOUCHER_RECORD_FIELDS) {
             String type = "VERSION_NO".equals(field) ? "long" : "string";
             String generalAccess = switch (field) {
-                case "WORK_DATE", "BRANCH_NO", "STATUS", "SERIAL_NO", "VOUCHER_NO", "PAYEE_NAME", "PAYEE_ACCT" -> "inout";
+                case "BRANCH_NO", "STATUS", "SERIAL_NO", "VOUCHER_NO", "PAYEE_NAME", "PAYEE_ACCT" -> "inout";
                 default -> "out";
             };
             String reviewAccess = switch (field) {
-                case "WORK_DATE", "BRANCH_NO", "SERIAL_NO" -> "inout";
+                case "BRANCH_NO", "SERIAL_NO" -> "inout";
                 default -> "out";
             };
             assertRepeatedParam(metadata, "CNAPS4609Q", field, type, generalAccess);

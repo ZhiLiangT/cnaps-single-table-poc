@@ -3,6 +3,7 @@
 #include "cnaps_service.h"
 
 #define BANK_QUERY_MAX_PAGE_SIZE 100
+#define BANK_QUERY_RESPONSE_BUFFER_SIZE (16L * 1024L)
 
 void BANKQRY(TPSVCINFO *rqst)
 {
@@ -36,6 +37,11 @@ void BANKQRY(TPSVCINFO *rqst)
         && (city_filter[0] == '\0' || strcmp(city_filter, city) == 0)
         && (system_type_filter[0] == '\0' || strcmp(system_type_filter, system_type) == 0);
 
+    fbfr = cnaps_reserve_response_buffer(rqst, BANK_QUERY_RESPONSE_BUFFER_SIZE);
+    if (fbfr == NULL) {
+        cnaps_return_error(rqst, "4002", "response buffer allocation failed");
+        return;
+    }
     cnaps_put_long(fbfr, CNAPS_F_PAGE_NO, page_no);
     cnaps_put_long(fbfr, CNAPS_F_PAGE_SIZE, page_size);
     cnaps_put_long(fbfr, CNAPS_F_TOTAL_ELEMENTS, matches ? 1 : 0);

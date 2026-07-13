@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <userlog.h>
 
+FBFR32 *cnaps_reserve_response_buffer(TPSVCINFO *rqst, long minimum_size);
 int cnaps_get_string(FBFR32 *fbfr, const char *field_name, char *out, size_t out_size);
 int cnaps_get_long(FBFR32 *fbfr, const char *field_name, long *out);
 int cnaps_put_string(FBFR32 *fbfr, const char *field_name, const char *value);

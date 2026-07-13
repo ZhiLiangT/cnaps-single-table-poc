@@ -6,6 +6,7 @@
 #include "cnaps_status.h"
 
 #define CNAPS_QUERY_MAX_ROWS 100
+#define CNAPS_QUERY_RESPONSE_BUFFER_SIZE (1024L * 1024L)
 
 static void get_field(FBFR32 *fbfr, const char *field, char *out, size_t out_size)
 {
@@ -105,6 +106,11 @@ void CNAPS4609Q(TPSVCINFO *rqst)
         cnaps_return_error(rqst, "4001", "database error");
         return;
     }
+    fbfr = cnaps_reserve_response_buffer(rqst, CNAPS_QUERY_RESPONSE_BUFFER_SIZE);
+    if (fbfr == NULL) {
+        cnaps_return_error(rqst, "4002", "response buffer allocation failed");
+        return;
+    }
     cnaps_put_long(fbfr, CNAPS_F_PAGE_NO, page_no);
     cnaps_put_long(fbfr, CNAPS_F_PAGE_SIZE, page_size);
     cnaps_put_long(fbfr, CNAPS_F_TOTAL_ELEMENTS, total);
@@ -189,6 +195,11 @@ void CNAPS5702Q(TPSVCINFO *rqst)
     );
     if (row_count < 0) {
         cnaps_return_error(rqst, "4001", "database error");
+        return;
+    }
+    fbfr = cnaps_reserve_response_buffer(rqst, CNAPS_QUERY_RESPONSE_BUFFER_SIZE);
+    if (fbfr == NULL) {
+        cnaps_return_error(rqst, "4002", "response buffer allocation failed");
         return;
     }
     cnaps_put_long(fbfr, CNAPS_F_PAGE_NO, page_no);

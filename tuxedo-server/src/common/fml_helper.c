@@ -5,6 +5,37 @@
 #include "cnaps_fields.h"
 #include "cnaps_service.h"
 
+FBFR32 *cnaps_reserve_response_buffer(TPSVCINFO *rqst, long minimum_size)
+{
+    FBFR32 *fbfr;
+    FBFR32 *resized;
+    long current_size;
+
+    if (rqst == NULL || rqst->data == NULL || minimum_size <= 0) {
+        return NULL;
+    }
+    fbfr = (FBFR32 *)rqst->data;
+    current_size = Fsizeof32(fbfr);
+    if (current_size < 0) {
+        userlog("failed to inspect FML32 response buffer: %s", Fstrerror32(Ferror32));
+        return NULL;
+    }
+    if (current_size >= minimum_size) {
+        return fbfr;
+    }
+    resized = (FBFR32 *)tprealloc(rqst->data, minimum_size);
+    if (resized == NULL) {
+        userlog(
+            "failed to grow FML32 response buffer to %ld bytes: %s",
+            minimum_size,
+            tpstrerror(tperrno)
+        );
+        return NULL;
+    }
+    rqst->data = (char *)resized;
+    return resized;
+}
+
 int cnaps_get_string(FBFR32 *fbfr, const char *field_name, char *out, size_t out_size)
 {
     FLDID32 field_id;

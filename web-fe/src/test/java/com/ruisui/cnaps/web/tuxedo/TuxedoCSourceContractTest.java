@@ -243,6 +243,41 @@ class TuxedoCSourceContractTest {
     }
 
     @Test
+    void nativePagedQueriesReserveEnoughFmlResponseCapacityBeforeWritingRows() throws Exception {
+        String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_service.h"));
+        String fml = Files.readString(root.resolve("tuxedo-server/src/common/fml_helper.c"));
+        String bank = Files.readString(root.resolve("tuxedo-server/src/services/bank_query.c"));
+        String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
+
+        assertThat(header).contains(
+            "FBFR32 *cnaps_reserve_response_buffer(TPSVCINFO *rqst, long minimum_size);"
+        );
+        assertThat(fml).contains(
+            "Fsizeof32(fbfr)",
+            "tprealloc(rqst->data, minimum_size)",
+            "rqst->data = (char *)resized"
+        );
+        assertThat(bank).contains(
+            "BANK_QUERY_RESPONSE_BUFFER_SIZE (16L * 1024L)",
+            "cnaps_reserve_response_buffer(rqst, BANK_QUERY_RESPONSE_BUFFER_SIZE)",
+            "response buffer allocation failed"
+        );
+        assertThat(query).contains(
+            "CNAPS_QUERY_RESPONSE_BUFFER_SIZE (1024L * 1024L)",
+            "cnaps_reserve_response_buffer(rqst, CNAPS_QUERY_RESPONSE_BUFFER_SIZE)",
+            "response buffer allocation failed"
+        );
+        assertThat(query.split(
+            "cnaps_reserve_response_buffer\\(rqst, CNAPS_QUERY_RESPONSE_BUFFER_SIZE\\)",
+            -1
+        )).hasSize(3);
+        assertThat(bank.indexOf("cnaps_reserve_response_buffer"))
+            .isLessThan(bank.indexOf("cnaps_put_long(fbfr, CNAPS_F_PAGE_NO"));
+        assertThat(query.indexOf("cnaps_reserve_response_buffer"))
+            .isLessThan(query.indexOf("cnaps_put_long(fbfr, CNAPS_F_PAGE_NO"));
+    }
+
+    @Test
     void nativeCreateAndUpdateValidateRequiredAndSuppliedDictionaryValues() throws Exception {
         String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
         String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));

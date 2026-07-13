@@ -275,12 +275,9 @@ class DeploymentArtifactTest {
     }
 
     @Test
-    void frontendApiDocumentsTheServerContextAndWorkDateContract() throws Exception {
+    void frontendApiDocumentsTheWorkDateContract() throws Exception {
         assertThat(Files.readString(root.resolve("docs/cnaps-frontend-api.md")))
             .contains(
-                "POC_OPERATOR_NO",
-                "POC_BRANCH_NO",
-                "webfe.poc.operatorNo",
                 "workDate",
                 "startWorkDate",
                 "endWorkDate",
@@ -371,7 +368,7 @@ class DeploymentArtifactTest {
         String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
 
         assertThat(api).contains(
-            "# 老式银行 Tuxedo 后端模拟系统 API 文档",
+            "# 银行 Tuxedo 后端模拟系统 API 文档",
             "文档版本：v0.5 单表 POC 版",
             "编写日期：2026-07-13",
             "## 1. 文档说明",

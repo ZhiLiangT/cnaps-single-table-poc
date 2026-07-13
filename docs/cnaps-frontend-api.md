@@ -69,10 +69,10 @@ Content-Type: application/json; charset=UTF-8
 
 - 录入接口：`workDate` 在 JSON Body 中必填。
 - 修改接口：`workDate` 在 JSON Body 中可选，未传时保持原值。
-- 通用查询和待复核查询：`workDate`、`startWorkDate`、`endWorkDate` 为可选 JSON Body 字段，均未传时不按工作日期筛选。
+- 通用查询和待复核查询：`startWorkDate`、`endWorkDate` 为可选 JSON Body 字段，均未传时不按工作日期筛选；列表请求不支持 `workDate`。
 - 详情、删除和复核接口：只使用 Path 中的 `billId`，不需要工作日期。
 
-概括而言，`workDate` 创建时必填，修改时可选。列表可按 `workDate` 精确过滤，或按起止工作日期范围过滤；未传日期参数时查询全部工作日期。修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
+概括而言，`workDate` 创建时必填，修改时可选。列表只按起止工作日期范围过滤，未传范围参数时查询全部工作日期。修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
 
 ### 2.5 分页
 
@@ -588,7 +588,6 @@ POST /api/cnaps/vouchers/query
 
 | 参数 | 类型 | 必输 | 默认值 | 说明 |
 |---|---:|:---:|---:|---|
-| `workDate` | string | 否 | - | 工作日期精确匹配，格式 `yyyy-MM-dd` |
 | `startWorkDate` | string | 否 | - | 工作日期下界，格式 `yyyy-MM-dd`，包含该日期 |
 | `endWorkDate` | string | 否 | - | 工作日期上界，格式 `yyyy-MM-dd`，包含该日期 |
 | `status` | string | 否 | - | 状态精确匹配 |
@@ -614,7 +613,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/query" \
   }'
 ```
 
-`startWorkDate` 和 `endWorkDate` 均包含边界，可单独使用；`workDate` 不得与日期范围参数同时使用。三个日期参数都不传或仅传空白值时，不按工作日期筛选。日期格式非法、日期不存在、参数混用或开始日期晚于结束日期时返回 `2002`。
+`startWorkDate` 和 `endWorkDate` 均包含边界，可单独使用；两者都不传或仅传空白值时，不按工作日期筛选。日期格式非法、日期不存在或开始日期晚于结束日期时返回 `2002`。请求 Body 只要包含旧字段 `workDate`（包括 `null`、空字符串或纯空白值），即返回 HTTP 400 / `2002`：`列表查询不支持 workDate，请使用 startWorkDate/endWorkDate`。
 
 ### 成功响应示例
 
@@ -672,7 +671,6 @@ POST /api/cnaps/vouchers/review-list
 
 | 参数 | 类型 | 必输 | 默认值 | 说明 |
 |---|---:|:---:|---:|---|
-| `workDate` | string | 否 | - | 工作日期精确匹配，格式 `yyyy-MM-dd` |
 | `startWorkDate` | string | 否 | - | 工作日期下界，格式 `yyyy-MM-dd`，包含该日期 |
 | `endWorkDate` | string | 否 | - | 工作日期上界，格式 `yyyy-MM-dd`，包含该日期 |
 | `serialNo` | string | 否 | - | 流水号精确匹配 |
@@ -691,7 +689,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/review-li
   }'
 ```
 
-日期筛选规则与通用查询一致：范围边界包含，可只传一端，`workDate` 与范围参数互斥，三个日期参数都不传或仅传空白值时查询全部工作日期。非法日期或非法参数组合返回 `2002`。
+日期筛选规则与通用查询一致：范围边界包含，可只传一端，两端都不传或仅传空白值时查询全部工作日期。非法日期或倒序范围返回 `2002`。请求 Body 只要包含旧字段 `workDate`（包括 `null`、空字符串或纯空白值），即返回 HTTP 400 / `2002`：`列表查询不支持 workDate，请使用 startWorkDate/endWorkDate`。
 
 ### 成功响应示例
 
@@ -1016,7 +1014,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B20260713
 ```text
 1. POST /api/cnaps/vouchers
 2. POST /api/cnaps/vouchers/{billId}/delete
-3. POST /api/cnaps/vouchers/query（Body: workDate、includeDeleted、pageNo、pageSize）
+3. POST /api/cnaps/vouchers/query（Body: startWorkDate、endWorkDate、includeDeleted、pageNo、pageSize）
 4. GET  /api/cnaps/vouchers/{billId}
 ```
 

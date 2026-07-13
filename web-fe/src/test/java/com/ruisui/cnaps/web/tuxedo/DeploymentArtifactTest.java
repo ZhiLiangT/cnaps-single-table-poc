@@ -305,6 +305,27 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void frontendApiDocumentsRangeOnlyVoucherListDates() throws Exception {
+        String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
+        String generalList = api.substring(
+            api.indexOf("## 6.7 通用查询"),
+            api.indexOf("## 6.8 待复核查询")
+        );
+        int reviewStart = api.indexOf("## 6.8 待复核查询");
+        String reviewList = api.substring(reviewStart, api.indexOf("## 6.9", reviewStart));
+
+        for (String section : List.of(generalList, reviewList)) {
+            assertThat(section)
+                .contains(
+                    "`startWorkDate`",
+                    "`endWorkDate`",
+                    "列表查询不支持 workDate，请使用 startWorkDate/endWorkDate"
+                )
+                .doesNotContain("| `workDate` | string | 否");
+        }
+    }
+
+    @Test
     void frontendApiDocumentsTheApprovedHeaderlessV03Contract() throws Exception {
         String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
 

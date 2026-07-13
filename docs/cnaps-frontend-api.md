@@ -1,4 +1,4 @@
-# 老式银行 Tuxedo 后端模拟系统 API 文档
+# 银行 Tuxedo 后端模拟系统 API 文档
 
 > 文档版本：v0.5 单表 POC 版<br>
 > 编写日期：2026-07-13<br>
@@ -50,19 +50,11 @@ http://localhost:8080/ruisui-bank-sim
 
 ### 2.2 请求头
 
-公共 API 不接收业务请求头。客户端不要传 `requestId`、`operatorNo`、`branchNo` 或 `workDate` 请求头。
-
 带 JSON Body 的请求只需协议头：
 
 ```http
 Content-Type: application/json; charset=UTF-8
 ```
-
-WebFE 自动完成：
-
-- 生成内部请求流水；
-- 读取 `webfe.poc.operatorNo` 或环境变量 `POC_OPERATOR_NO` 配置的固定 POC 操作员，默认 `77210021`；
-- 读取 `webfe.poc.branchNo` 或环境变量 `POC_BRANCH_NO` 配置的固定 POC 机构，默认 `772`。
 
 ### 2.3 日期、时间、金额和编码
 

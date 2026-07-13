@@ -53,8 +53,23 @@ class RequestSupportTest {
     }
 
     @Test
-    void removesBlankWorkDateFiltersWithoutAddingDefaults() {
-        Map<String, Object> fields = new LinkedHashMap<>(Map.of("workDate", "  "));
+    void rejectsRetiredWorkDateKeyEvenWhenBlankOrNull() {
+        for (Object value : java.util.Arrays.asList("2026-07-10", " ", "", null)) {
+            Map<String, Object> fields = new LinkedHashMap<>();
+            fields.put("workDate", value);
+
+            assertThat(RequestSupport.validateWorkDateFilter(fields))
+                .as(String.valueOf(value))
+                .isEqualTo("列表查询不支持 workDate，请使用 startWorkDate/endWorkDate");
+        }
+    }
+
+    @Test
+    void removesBlankRangeBoundsWithoutAddingDefaults() {
+        Map<String, Object> fields = new LinkedHashMap<>(Map.of(
+            "startWorkDate", " ",
+            "endWorkDate", ""
+        ));
 
         String error = RequestSupport.validateWorkDateFilter(fields);
 

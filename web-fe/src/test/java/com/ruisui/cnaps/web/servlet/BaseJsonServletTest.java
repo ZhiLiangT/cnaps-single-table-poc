@@ -109,7 +109,7 @@ class BaseJsonServletTest {
     }
 
     @Test
-    void removesBlankWorkDateFiltersBeforeCallingTuxedo() throws Exception {
+    void removesBlankRangeBoundsBeforeCallingTuxedo() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
@@ -117,7 +117,7 @@ class BaseJsonServletTest {
             jsonRequest(
                 "/api/cnaps/vouchers/query",
                 "/query",
-                "{\"workDate\":\" \",\"startWorkDate\":\"\",\"endWorkDate\":\"  \"}"
+                "{\"startWorkDate\":\"\",\"endWorkDate\":\"  \"}"
             ),
             response(new ByteArrayOutputStream())
         );
@@ -127,33 +127,34 @@ class BaseJsonServletTest {
     }
 
     @Test
-    void preservesExplicitWorkDateForVoucherCollection() throws Exception {
+    void rejectsRetiredWorkDateKeyWithoutCallingTuxedo() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
-
-        servlet.doPost(
-            jsonRequest(
-                "/api/cnaps/vouchers/review-list",
-                "/review-list",
-                Map.of(
-                    "requestId", "CLIENT-REQ",
-                    "operatorNo", "CLIENT-OP",
-                    "branchNo", "CLIENT-BRANCH",
-                    "workDate", "HEADER-WORK-DATE"
-                ),
-                "{\"workDate\":\"2026-07-08\"}"
-            ),
-            response(new ByteArrayOutputStream())
+        List<String> retiredFilters = List.of(
+            "{\"workDate\":\"2026-07-08\"}",
+            "{\"workDate\":\"\"}",
+            "{\"workDate\":\"   \"}",
+            "{\"workDate\":null}"
         );
 
-        assertThat(captured.get().fields())
-            .containsEntry("WORK_DATE", "2026-07-08")
-            .containsEntry("OPERATOR_NO", "SERVER-OP")
-            .containsEntry("BRANCH_NO", "SERVER-BRANCH")
-            .doesNotContainValue("CLIENT-REQ")
-            .doesNotContainValue("CLIENT-OP")
-            .doesNotContainValue("CLIENT-BRANCH")
-            .doesNotContainValue("HEADER-WORK-DATE");
+        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
+            for (String filter : retiredFilters) {
+                captured.set(null);
+                ByteArrayOutputStream body = new ByteArrayOutputStream();
+                AtomicInteger status = new AtomicInteger();
+
+                servlet.doPost(
+                    jsonRequest(path, path.substring(19), filter),
+                    response(body, status)
+                );
+
+                assertThat(status.get()).as(path + " " + filter).isEqualTo(400);
+                assertThat(body.toString(StandardCharsets.UTF_8))
+                    .as(path + " " + filter)
+                    .isEqualTo("{\"respCode\":\"2002\",\"respMsg\":\"列表查询不支持 workDate，请使用 startWorkDate/endWorkDate\",\"data\":null}");
+                assertThat(captured.get()).as(path + " " + filter).isNull();
+            }
+        }
     }
 
     @Test
@@ -170,44 +171,12 @@ class BaseJsonServletTest {
     }
 
     @Test
-    void rejectsInvalidExplicitCollectionWorkDateWithoutCallingTuxedo() throws Exception {
-        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
-        CnapsVoucherServlet servlet = voucherServlet(captured);
-
-        for (String[] testCase : new String[][] {
-            {"/api/cnaps/vouchers/query", "2026/07/10"},
-            {"/api/cnaps/vouchers/query", "0000-01-01"},
-            {"/api/cnaps/vouchers/review-list", "2026-02-30"},
-            {"/api/cnaps/vouchers/review-list", "2026-07-10-extra"}
-        }) {
-            captured.set(null);
-            ByteArrayOutputStream body = new ByteArrayOutputStream();
-            AtomicInteger status = new AtomicInteger();
-            servlet.doPost(
-                jsonRequest(
-                    testCase[0],
-                    testCase[0].substring(19),
-                    "{\"workDate\":\"" + testCase[1] + "\"}"
-                ),
-                response(body, status)
-            );
-
-            assertThat(status.get()).as(testCase[0] + " " + testCase[1]).isEqualTo(400);
-            assertThat(body.toString(java.nio.charset.StandardCharsets.UTF_8))
-                .as(testCase[0] + " " + testCase[1])
-                .isEqualTo("{\"respCode\":\"2002\",\"respMsg\":\"工作日期格式错误\",\"data\":null}");
-            assertThat(captured.get()).as(testCase[0] + " " + testCase[1]).isNull();
-        }
-    }
-
-    @Test
     void rejectsInvalidWorkDateRangesWithoutCallingTuxedo() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
         List<String> invalidFilters = List.of(
             "{\"startWorkDate\":\"2026/07/10\"}",
             "{\"endWorkDate\":\"2026-02-30\"}",
-            "{\"workDate\":\"2026-07-10\",\"startWorkDate\":\"2026-07-09\"}",
             "{\"startWorkDate\":\"2026-07-12\",\"endWorkDate\":\"2026-07-10\"}"
         );
 

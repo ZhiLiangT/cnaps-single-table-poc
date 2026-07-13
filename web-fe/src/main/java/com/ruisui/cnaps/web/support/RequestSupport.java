@@ -42,19 +42,16 @@ public final class RequestSupport {
     }
 
     public static String validateWorkDateFilter(Map<String, Object> fields) {
-        removeBlank(fields, "workDate");
+        if (fields.containsKey("workDate")) {
+            return "列表查询不支持 workDate，请使用 startWorkDate/endWorkDate";
+        }
         removeBlank(fields, "startWorkDate");
         removeBlank(fields, "endWorkDate");
-        String workDate = text(fields.get("workDate"));
         String startWorkDate = text(fields.get("startWorkDate"));
         String endWorkDate = text(fields.get("endWorkDate"));
-        if (!isValidOptionalWorkDate(workDate)
-            || !isValidOptionalWorkDate(startWorkDate)
+        if (!isValidOptionalWorkDate(startWorkDate)
             || !isValidOptionalWorkDate(endWorkDate)) {
             return "工作日期格式错误";
-        }
-        if (workDate != null && (startWorkDate != null || endWorkDate != null)) {
-            return "工作日期不能与起止日期同时使用";
         }
         if (startWorkDate != null
             && endWorkDate != null

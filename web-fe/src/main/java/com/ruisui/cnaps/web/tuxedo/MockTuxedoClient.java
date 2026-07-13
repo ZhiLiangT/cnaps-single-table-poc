@@ -265,7 +265,6 @@ public class MockTuxedoClient implements TuxedoClient {
         int pageSize = pageSize(request);
         List<Map<String, Object>> matching = vouchers.values().stream()
             .filter(voucher -> matches(voucher, "STATUS", status, false))
-            .filter(voucher -> matches(voucher, "WORK_DATE", optionalText(request, "WORK_DATE"), false))
             .filter(voucher -> matchesLowerWorkDate(voucher, optionalText(request, "START_WORK_DATE")))
             .filter(voucher -> matchesUpperWorkDate(voucher, optionalText(request, "END_WORK_DATE")))
             .filter(voucher -> matches(voucher, "BRANCH_NO", text(request, "BRANCH_NO"), false))
@@ -428,16 +427,11 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private TuxedoResponse validateWorkDateFilter(TuxedoRequest request) {
-        String workDate = optionalText(request, "WORK_DATE");
         String startWorkDate = optionalText(request, "START_WORK_DATE");
         String endWorkDate = optionalText(request, "END_WORK_DATE");
-        if (!validOptionalWorkDate(workDate)
-            || !validOptionalWorkDate(startWorkDate)
+        if (!validOptionalWorkDate(startWorkDate)
             || !validOptionalWorkDate(endWorkDate)) {
             return TuxedoResponse.fail("2002", "工作日期格式错误");
-        }
-        if (workDate != null && (startWorkDate != null || endWorkDate != null)) {
-            return TuxedoResponse.fail("2002", "工作日期不能与起止日期同时使用");
         }
         if (startWorkDate != null
             && endWorkDate != null

@@ -92,35 +92,19 @@ class MockTuxedoClientWorkDateTest {
     }
 
     @Test
-    void voucherListFiltersByWorkDateAndTrustedBranch() {
-        TuxedoResponse matching = createVoucher("2026-07-10", "SERVER-BRANCH");
+    void voucherQueriesDoNotUseWorkDateAsAnExactFilter() {
+        createVoucher("2026-07-10", "SERVER-BRANCH");
         createVoucher("2026-07-11", "SERVER-BRANCH");
         createVoucher("2026-07-10", "OTHER-BRANCH");
 
-        List<Map<String, Object>> records = records(client.call(
-            "CNAPS4609Q",
-            request(Map.of("WORK_DATE", "2026-07-10", "BRANCH_NO", "SERVER-BRANCH"))
-        ));
-
-        assertThat(records)
-            .extracting(record -> record.get("BILL_ID"))
-            .containsExactly(matching.fields().get("BILL_ID"));
-    }
-
-    @Test
-    void reviewListFiltersByWorkDateAndTrustedBranch() {
-        TuxedoResponse matching = createVoucher("2026-07-10", "SERVER-BRANCH");
-        createVoucher("2026-07-11", "SERVER-BRANCH");
-        createVoucher("2026-07-10", "OTHER-BRANCH");
-
-        List<Map<String, Object>> records = records(client.call(
-            "CNAPS5702Q",
-            request(Map.of("WORK_DATE", "2026-07-10", "BRANCH_NO", "SERVER-BRANCH"))
-        ));
-
-        assertThat(records)
-            .extracting(record -> record.get("BILL_ID"))
-            .containsExactly(matching.fields().get("BILL_ID"));
+        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+            assertThat(records(client.call(
+                service,
+                request(Map.of("WORK_DATE", "2026-07-10", "BRANCH_NO", "SERVER-BRANCH"))
+            )))
+                .extracting(record -> record.get("WORK_DATE"))
+                .containsExactly("2026-07-10", "2026-07-11");
+        }
     }
 
     @Test
@@ -194,7 +178,6 @@ class MockTuxedoClientWorkDateTest {
         List<Map<String, ?>> invalidFilters = List.of(
             Map.of("START_WORK_DATE", "2026/07/10"),
             Map.of("END_WORK_DATE", "2026-02-30"),
-            Map.of("WORK_DATE", "2026-07-10", "START_WORK_DATE", "2026-07-09"),
             Map.of("START_WORK_DATE", "2026-07-12", "END_WORK_DATE", "2026-07-10")
         );
 
@@ -204,18 +187,6 @@ class MockTuxedoClientWorkDateTest {
                     .as(service + " " + filter)
                     .isEqualTo("2002");
             }
-        }
-    }
-
-    @Test
-    void voucherQueriesRejectMalformedAndCalendarInvalidExplicitWorkDates() {
-        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
-            assertThat(client.call(service, request(Map.of("WORK_DATE", "2026/07/10"))).respCode())
-                .as(service + " malformed")
-                .isEqualTo("2002");
-            assertThat(client.call(service, request(Map.of("WORK_DATE", "2026-02-30"))).respCode())
-                .as(service + " calendar invalid")
-                .isEqualTo("2002");
         }
     }
 
@@ -238,13 +209,6 @@ class MockTuxedoClientWorkDateTest {
                     "WORK_DATE", invalidWorkDate
                 ))
             ).respCode()).as("update " + invalidWorkDate).isEqualTo("2002");
-
-            for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
-                assertThat(client.call(
-                    service,
-                    request(Map.of("WORK_DATE", invalidWorkDate))
-                ).respCode()).as(service + " " + invalidWorkDate).isEqualTo("2002");
-            }
         }
     }
 

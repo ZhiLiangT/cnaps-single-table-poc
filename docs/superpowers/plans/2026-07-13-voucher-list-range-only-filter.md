@@ -286,7 +286,7 @@ Delete the exact predicate and both count/page bindings:
 
 ```c
 "WHERE (:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD')) " \
-"AND (:end_work_date IS NULL OR WORK_DATE<TO_DATE(:end_work_date, 'YYYY-MM-DD')+1) " \
+"AND (:end_work_date IS NULL OR WORK_DATE<=TO_DATE(:end_work_date, 'YYYY-MM-DD')+(86399/86400)) " \
 ```
 
 - [ ] **Step 4: Run the native contract test and verify GREEN**

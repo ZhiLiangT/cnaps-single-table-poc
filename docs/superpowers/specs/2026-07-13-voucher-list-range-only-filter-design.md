@@ -62,10 +62,10 @@ The shared Oracle predicates retain only the range filters:
 
 ```sql
 (:start_work_date IS NULL OR WORK_DATE >= TO_DATE(:start_work_date, 'YYYY-MM-DD'))
-AND (:end_work_date IS NULL OR WORK_DATE < TO_DATE(:end_work_date, 'YYYY-MM-DD') + 1)
+AND (:end_work_date IS NULL OR WORK_DATE <= TO_DATE(:end_work_date, 'YYYY-MM-DD') + (86399/86400))
 ```
 
-The upper predicate remains exclusive of the following day, which makes `endWorkDate` inclusive even if the database column contains a time component.
+The upper predicate includes the final second of the requested day. This keeps `endWorkDate` inclusive when the database column contains a time component without overflowing Oracle DATE when the accepted maximum `9999-12-31` is supplied.
 
 All non-date filters, branch scoping, review-list fixed status, deleted-record handling, ordering, and pagination remain unchanged.
 

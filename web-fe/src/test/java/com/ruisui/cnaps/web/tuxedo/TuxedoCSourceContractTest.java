@@ -361,7 +361,9 @@ class TuxedoCSourceContractTest {
         assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_END_WORK_DATE")).isEqualTo(2);
         assertThat(db).contains(
             "(:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD'))",
-            "(:end_work_date IS NULL OR WORK_DATE<TO_DATE(:end_work_date, 'YYYY-MM-DD')+1)"
+            "(:end_work_date IS NULL OR WORK_DATE<=TO_DATE(:end_work_date, 'YYYY-MM-DD')+(86399/86400))"
+        ).doesNotContain(
+            "WORK_DATE<TO_DATE(:end_work_date, 'YYYY-MM-DD')+1"
         );
         assertThat(dbQuery).doesNotContain(":work_date");
         assertThat(countOccurrences(db, "bind_text(stmt, \":start_work_date\", start_work_date)")).isEqualTo(2);

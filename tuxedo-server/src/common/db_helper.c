@@ -351,7 +351,7 @@ static int define_long(OCIStmt *stmt, int position, long *value, sb2 *indicator)
 
 #define CNAPS_QUERY_PREDICATES \
     "WHERE (:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD')) " \
-    "AND (:end_work_date IS NULL OR WORK_DATE<TO_DATE(:end_work_date, 'YYYY-MM-DD')+1) " \
+    "AND (:end_work_date IS NULL OR WORK_DATE<=TO_DATE(:end_work_date, 'YYYY-MM-DD')+(86399/86400)) " \
     "AND (:branch_no IS NULL OR BRANCH_NO=:branch_no) " \
     "AND (:status IS NULL OR STATUS=:status) " \
     "AND (:serial_no IS NULL OR SERIAL_NO=:serial_no) " \

@@ -79,6 +79,20 @@ class TuxedoRequestMapperTest {
     }
 
     @Test
+    void mapsWorkDateRangeToCanonicalFmlFieldNames() {
+        TuxedoRequest request = mapper.from(
+            "SERVER-REQ",
+            "SERVER-OP",
+            "SERVER-BRANCH",
+            Map.of("startWorkDate", "2026-07-10", "endWorkDate", "2026-07-12")
+        );
+
+        assertThat(request.fields())
+            .containsEntry("START_WORK_DATE", "2026-07-10")
+            .containsEntry("END_WORK_DATE", "2026-07-12");
+    }
+
+    @Test
     void exposesOnlyV03PaginationNames() {
         TuxedoRequest v03Request = mapper.from(
             "SERVER-REQ",

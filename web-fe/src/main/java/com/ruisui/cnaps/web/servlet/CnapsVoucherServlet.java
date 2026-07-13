@@ -18,18 +18,15 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
         Map<String, Object> fields = new LinkedHashMap<>(RequestSupport.queryParams(request));
         String apiPath = RequestSupport.apiPath(request);
         if ("/api/cnaps/vouchers".equals(apiPath) || "/api/cnaps/vouchers/review-list".equals(apiPath)) {
-            Object explicitWorkDate = fields.get("workDate");
-            if (explicitWorkDate != null
-                && !String.valueOf(explicitWorkDate).isBlank()
-                && !RequestSupport.isValidWorkDate(String.valueOf(explicitWorkDate))) {
+            String validationError = RequestSupport.validateWorkDateFilter(fields);
+            if (validationError != null) {
                 JsonSupport.write(
                     response,
                     HttpServletResponse.SC_BAD_REQUEST,
-                    ApiResponse.fail("2002", "工作日期格式错误")
+                    ApiResponse.fail("2002", validationError)
                 );
                 return;
             }
-            RequestSupport.includeDefaultWorkDate(fields);
         }
         RequestSupport.includeBillPath(fields, request.getPathInfo());
         callTuxedo(request, response, fields);

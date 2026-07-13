@@ -41,11 +41,24 @@ public final class RequestSupport {
         }
     }
 
-    public static void includeDefaultWorkDate(Map<String, Object> fields) {
-        Object workDate = fields.get("workDate");
-        if (workDate == null || String.valueOf(workDate).isBlank()) {
-            fields.put("workDate", LocalDate.now().toString());
+    public static String validateWorkDateFilter(Map<String, Object> fields) {
+        String workDate = text(fields.get("workDate"));
+        String startWorkDate = text(fields.get("startWorkDate"));
+        String endWorkDate = text(fields.get("endWorkDate"));
+        if (!isValidOptionalWorkDate(workDate)
+            || !isValidOptionalWorkDate(startWorkDate)
+            || !isValidOptionalWorkDate(endWorkDate)) {
+            return "工作日期格式错误";
         }
+        if (workDate != null && (startWorkDate != null || endWorkDate != null)) {
+            return "工作日期不能与起止日期同时使用";
+        }
+        if (startWorkDate != null
+            && endWorkDate != null
+            && LocalDate.parse(startWorkDate).isAfter(LocalDate.parse(endWorkDate))) {
+            return "开始工作日期不能晚于结束工作日期";
+        }
+        return null;
     }
 
     public static boolean isValidWorkDate(String value) {
@@ -58,5 +71,16 @@ public final class RequestSupport {
         } catch (DateTimeParseException ex) {
             return false;
         }
+    }
+
+    private static String text(Object value) {
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+        return String.valueOf(value);
+    }
+
+    private static boolean isValidOptionalWorkDate(String value) {
+        return value == null || isValidWorkDate(value);
     }
 }

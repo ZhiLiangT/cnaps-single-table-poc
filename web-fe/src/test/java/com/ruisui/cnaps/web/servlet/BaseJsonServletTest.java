@@ -16,8 +16,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,17 +65,42 @@ class BaseJsonServletTest {
     }
 
     @Test
-    void defaultsWorkDateForVoucherCollection() throws Exception {
+    void doesNotDefaultDateFilterForVoucherCollections() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
-        String dateBefore = LocalDate.now().toString();
 
-        servlet.doGet(
-            request("/api/cnaps/vouchers", null, Map.of()),
-            response(new ByteArrayOutputStream())
-        );
+        for (String path : List.of("/api/cnaps/vouchers", "/api/cnaps/vouchers/review-list")) {
+            captured.set(null);
+            servlet.doGet(
+                request(path, null, Map.of()),
+                response(new ByteArrayOutputStream())
+            );
 
-        assertThat(captured.get().fields().get("WORK_DATE")).isIn(dateBefore, LocalDate.now().toString());
+            assertThat(captured.get().fields())
+                .doesNotContainKeys("WORK_DATE", "START_WORK_DATE", "END_WORK_DATE");
+        }
+    }
+
+    @Test
+    void forwardsWorkDateRangeForVoucherCollections() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        for (String path : List.of("/api/cnaps/vouchers", "/api/cnaps/vouchers/review-list")) {
+            captured.set(null);
+            servlet.doGet(
+                request(path, null, Map.of(
+                    "startWorkDate", new String[] {"2026-07-10"},
+                    "endWorkDate", new String[] {"2026-07-12"}
+                )),
+                response(new ByteArrayOutputStream())
+            );
+
+            assertThat(captured.get().fields())
+                .containsEntry("START_WORK_DATE", "2026-07-10")
+                .containsEntry("END_WORK_DATE", "2026-07-12")
+                .doesNotContainKey("WORK_DATE");
+        }
     }
 
     @Test
@@ -145,6 +170,39 @@ class BaseJsonServletTest {
                 .as(testCase[0] + " " + testCase[1])
                 .isEqualTo("{\"respCode\":\"2002\",\"respMsg\":\"工作日期格式错误\",\"data\":null}");
             assertThat(captured.get()).as(testCase[0] + " " + testCase[1]).isNull();
+        }
+    }
+
+    @Test
+    void rejectsInvalidWorkDateRangesWithoutCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+        List<Map<String, String[]>> invalidFilters = List.of(
+            Map.of("startWorkDate", new String[] {"2026/07/10"}),
+            Map.of("endWorkDate", new String[] {"2026-02-30"}),
+            Map.of(
+                "workDate", new String[] {"2026-07-10"},
+                "startWorkDate", new String[] {"2026-07-09"}
+            ),
+            Map.of(
+                "startWorkDate", new String[] {"2026-07-12"},
+                "endWorkDate", new String[] {"2026-07-10"}
+            )
+        );
+
+        for (String path : List.of("/api/cnaps/vouchers", "/api/cnaps/vouchers/review-list")) {
+            for (Map<String, String[]> filter : invalidFilters) {
+                captured.set(null);
+                ByteArrayOutputStream body = new ByteArrayOutputStream();
+                AtomicInteger status = new AtomicInteger();
+
+                servlet.doGet(request(path, null, filter), response(body, status));
+
+                assertThat(status.get()).as(path + " " + filter.keySet()).isEqualTo(400);
+                assertThat(body.toString(java.nio.charset.StandardCharsets.UTF_8))
+                    .contains("\"respCode\":\"2002\"");
+                assertThat(captured.get()).as(path + " " + filter.keySet()).isNull();
+            }
         }
     }
 

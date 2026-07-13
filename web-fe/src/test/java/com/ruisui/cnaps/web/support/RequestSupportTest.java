@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Proxy;
-import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -44,32 +43,35 @@ class RequestSupportTest {
     }
 
     @Test
-    void includesCurrentWorkDateWhenMissing() {
+    void acceptsMissingWorkDateFiltersWithoutAddingDefaults() {
         Map<String, Object> fields = new LinkedHashMap<>();
-        String dateBefore = LocalDate.now().toString();
 
-        RequestSupport.includeDefaultWorkDate(fields);
+        String error = RequestSupport.validateWorkDateFilter(fields);
 
-        assertThat(fields.get("workDate")).isIn(dateBefore, LocalDate.now().toString());
+        assertThat(error).isNull();
+        assertThat(fields).isEmpty();
     }
 
     @Test
-    void includesCurrentWorkDateWhenBlank() {
+    void acceptsBlankWorkDateFiltersWithoutAddingDefaults() {
         Map<String, Object> fields = new LinkedHashMap<>(Map.of("workDate", "  "));
-        String dateBefore = LocalDate.now().toString();
 
-        RequestSupport.includeDefaultWorkDate(fields);
+        String error = RequestSupport.validateWorkDateFilter(fields);
 
-        assertThat(fields.get("workDate")).isIn(dateBefore, LocalDate.now().toString());
+        assertThat(error).isNull();
+        assertThat(fields).containsEntry("workDate", "  ");
     }
 
     @Test
-    void preservesExplicitWorkDate() {
-        Map<String, Object> fields = new LinkedHashMap<>(Map.of("workDate", "2026-07-08"));
+    void acceptsInclusiveOrderedWorkDateRange() {
+        Map<String, Object> fields = new LinkedHashMap<>(Map.of(
+            "startWorkDate", "2026-07-08",
+            "endWorkDate", "2026-07-08"
+        ));
 
-        RequestSupport.includeDefaultWorkDate(fields);
+        String error = RequestSupport.validateWorkDateFilter(fields);
 
-        assertThat(fields).containsEntry("workDate", "2026-07-08");
+        assertThat(error).isNull();
     }
 
     @Test

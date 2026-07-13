@@ -8,13 +8,17 @@ import org.junit.jupiter.api.io.TempDir;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
+import javax.servlet.ReadListener;
+import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -69,15 +73,15 @@ class BaseJsonServletTest {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
-        for (String path : List.of("/api/cnaps/vouchers", "/api/cnaps/vouchers/review-list")) {
+        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
             captured.set(null);
-            servlet.doGet(
-                request(path, null, Map.of()),
+            servlet.doPost(
+                jsonRequest(path, path.substring(19), "{}"),
                 response(new ByteArrayOutputStream())
             );
 
             assertThat(captured.get().fields())
-                .doesNotContainKeys("WORK_DATE", "START_WORK_DATE", "END_WORK_DATE");
+                .doesNotContainKeys("BILL_ID", "WORK_DATE", "START_WORK_DATE", "END_WORK_DATE");
         }
     }
 
@@ -86,20 +90,21 @@ class BaseJsonServletTest {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
-        for (String path : List.of("/api/cnaps/vouchers", "/api/cnaps/vouchers/review-list")) {
+        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
             captured.set(null);
-            servlet.doGet(
-                request(path, null, Map.of(
-                    "startWorkDate", new String[] {"2026-07-10"},
-                    "endWorkDate", new String[] {"2026-07-12"}
-                )),
+            servlet.doPost(
+                jsonRequest(
+                    path,
+                    path.substring(19),
+                    "{\"startWorkDate\":\"2026-07-10\",\"endWorkDate\":\"2026-07-12\"}"
+                ),
                 response(new ByteArrayOutputStream())
             );
 
             assertThat(captured.get().fields())
                 .containsEntry("START_WORK_DATE", "2026-07-10")
                 .containsEntry("END_WORK_DATE", "2026-07-12")
-                .doesNotContainKey("WORK_DATE");
+                .doesNotContainKeys("BILL_ID", "WORK_DATE");
         }
     }
 
@@ -108,12 +113,12 @@ class BaseJsonServletTest {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
-        servlet.doGet(
-            request("/api/cnaps/vouchers", null, Map.of(
-                "workDate", new String[] {" "},
-                "startWorkDate", new String[] {""},
-                "endWorkDate", new String[] {"  "}
-            )),
+        servlet.doPost(
+            jsonRequest(
+                "/api/cnaps/vouchers/query",
+                "/query",
+                "{\"workDate\":\" \",\"startWorkDate\":\"\",\"endWorkDate\":\"  \"}"
+            ),
             response(new ByteArrayOutputStream())
         );
 
@@ -126,8 +131,8 @@ class BaseJsonServletTest {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
-        servlet.doGet(
-            request(
+        servlet.doPost(
+            jsonRequest(
                 "/api/cnaps/vouchers/review-list",
                 "/review-list",
                 Map.of(
@@ -136,7 +141,7 @@ class BaseJsonServletTest {
                     "branchNo", "CLIENT-BRANCH",
                     "workDate", "HEADER-WORK-DATE"
                 ),
-                Map.of("workDate", new String[] {"2026-07-08"})
+                "{\"workDate\":\"2026-07-08\"}"
             ),
             response(new ByteArrayOutputStream())
         );
@@ -170,16 +175,20 @@ class BaseJsonServletTest {
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
         for (String[] testCase : new String[][] {
-            {"/api/cnaps/vouchers", "2026/07/10"},
-            {"/api/cnaps/vouchers", "0000-01-01"},
+            {"/api/cnaps/vouchers/query", "2026/07/10"},
+            {"/api/cnaps/vouchers/query", "0000-01-01"},
             {"/api/cnaps/vouchers/review-list", "2026-02-30"},
             {"/api/cnaps/vouchers/review-list", "2026-07-10-extra"}
         }) {
             captured.set(null);
             ByteArrayOutputStream body = new ByteArrayOutputStream();
             AtomicInteger status = new AtomicInteger();
-            servlet.doGet(
-                request(testCase[0], null, Map.of("workDate", new String[] {testCase[1]})),
+            servlet.doPost(
+                jsonRequest(
+                    testCase[0],
+                    testCase[0].substring(19),
+                    "{\"workDate\":\"" + testCase[1] + "\"}"
+                ),
                 response(body, status)
             );
 
@@ -195,32 +204,51 @@ class BaseJsonServletTest {
     void rejectsInvalidWorkDateRangesWithoutCallingTuxedo() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
-        List<Map<String, String[]>> invalidFilters = List.of(
-            Map.of("startWorkDate", new String[] {"2026/07/10"}),
-            Map.of("endWorkDate", new String[] {"2026-02-30"}),
-            Map.of(
-                "workDate", new String[] {"2026-07-10"},
-                "startWorkDate", new String[] {"2026-07-09"}
-            ),
-            Map.of(
-                "startWorkDate", new String[] {"2026-07-12"},
-                "endWorkDate", new String[] {"2026-07-10"}
-            )
+        List<String> invalidFilters = List.of(
+            "{\"startWorkDate\":\"2026/07/10\"}",
+            "{\"endWorkDate\":\"2026-02-30\"}",
+            "{\"workDate\":\"2026-07-10\",\"startWorkDate\":\"2026-07-09\"}",
+            "{\"startWorkDate\":\"2026-07-12\",\"endWorkDate\":\"2026-07-10\"}"
         );
 
-        for (String path : List.of("/api/cnaps/vouchers", "/api/cnaps/vouchers/review-list")) {
-            for (Map<String, String[]> filter : invalidFilters) {
+        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
+            for (String filter : invalidFilters) {
                 captured.set(null);
                 ByteArrayOutputStream body = new ByteArrayOutputStream();
                 AtomicInteger status = new AtomicInteger();
 
-                servlet.doGet(request(path, null, filter), response(body, status));
+                servlet.doPost(
+                    jsonRequest(path, path.substring(19), filter),
+                    response(body, status)
+                );
 
-                assertThat(status.get()).as(path + " " + filter.keySet()).isEqualTo(400);
+                assertThat(status.get()).as(path + " " + filter).isEqualTo(400);
                 assertThat(body.toString(java.nio.charset.StandardCharsets.UTF_8))
                     .contains("\"respCode\":\"2002\"");
-                assertThat(captured.get()).as(path + " " + filter.keySet()).isNull();
+                assertThat(captured.get()).as(path + " " + filter).isNull();
             }
+        }
+    }
+
+    @Test
+    void rejectsVoucherListGetRequestsWithoutCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        for (String path : List.of(
+            "/api/cnaps/vouchers",
+            "/api/cnaps/vouchers/query",
+            "/api/cnaps/vouchers/review-list"
+        )) {
+            captured.set(null);
+            AtomicInteger status = new AtomicInteger();
+            servlet.doGet(
+                request(path, path.equals("/api/cnaps/vouchers") ? null : path.substring(19), Map.of()),
+                response(new ByteArrayOutputStream(), status)
+            );
+
+            assertThat(status.get()).as(path).isEqualTo(405);
+            assertThat(captured.get()).as(path).isNull();
         }
     }
 
@@ -288,6 +316,52 @@ class BaseJsonServletTest {
             case "getContextPath" -> "";
             case "getPathInfo" -> pathInfo;
             case "getParameterMap" -> parameters;
+            default -> defaultValue(method.getReturnType());
+        });
+    }
+
+    private HttpServletRequest jsonRequest(String uri, String pathInfo, String json) {
+        return jsonRequest(uri, pathInfo, Map.of(), json);
+    }
+
+    private HttpServletRequest jsonRequest(
+        String uri,
+        String pathInfo,
+        Map<String, String> headers,
+        String json
+    ) {
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+        ServletInputStream input = new ServletInputStream() {
+            private final ByteArrayInputStream delegate = new ByteArrayInputStream(bytes);
+
+            @Override
+            public int read() {
+                return delegate.read();
+            }
+
+            @Override
+            public boolean isFinished() {
+                return delegate.available() == 0;
+            }
+
+            @Override
+            public boolean isReady() {
+                return true;
+            }
+
+            @Override
+            public void setReadListener(ReadListener readListener) {
+            }
+        };
+        return proxy(HttpServletRequest.class, (method, args) -> switch (method.getName()) {
+            case "getHeader" -> headers.get(String.valueOf(args[0]));
+            case "getMethod" -> "POST";
+            case "getRequestURI" -> uri;
+            case "getContextPath" -> "";
+            case "getPathInfo" -> pathInfo;
+            case "getContentType" -> "application/json; charset=UTF-8";
+            case "getContentLengthLong" -> (long) bytes.length;
+            case "getInputStream" -> input;
             default -> defaultValue(method.getReturnType());
         });
     }

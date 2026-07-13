@@ -15,19 +15,12 @@ import java.util.Map;
 public class CnapsVoucherServlet extends BaseJsonServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Map<String, Object> fields = new LinkedHashMap<>(RequestSupport.queryParams(request));
         String apiPath = RequestSupport.apiPath(request);
-        if ("/api/cnaps/vouchers".equals(apiPath) || "/api/cnaps/vouchers/review-list".equals(apiPath)) {
-            String validationError = RequestSupport.validateWorkDateFilter(fields);
-            if (validationError != null) {
-                JsonSupport.write(
-                    response,
-                    HttpServletResponse.SC_BAD_REQUEST,
-                    ApiResponse.fail("2002", validationError)
-                );
-                return;
-            }
+        if (isRejectedGetPath(apiPath)) {
+            response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+            return;
         }
+        Map<String, Object> fields = new LinkedHashMap<>(RequestSupport.queryParams(request));
         RequestSupport.includeBillPath(fields, request.getPathInfo());
         callTuxedo(request, response, fields);
     }
@@ -35,7 +28,14 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, Object> fields = JsonSupport.readBodyMap(request);
-        RequestSupport.includeBillPath(fields, request.getPathInfo());
+        String apiPath = RequestSupport.apiPath(request);
+        boolean listPost = isListPostPath(apiPath);
+        if (listPost && !validateListFilters(fields, response)) {
+            return;
+        }
+        if (!listPost) {
+            RequestSupport.includeBillPath(fields, request.getPathInfo());
+        }
         callTuxedo(request, response, fields);
     }
 
@@ -44,5 +44,29 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
         Map<String, Object> fields = JsonSupport.readBodyMap(request);
         RequestSupport.includeBillPath(fields, request.getPathInfo());
         callTuxedo(request, response, fields);
+    }
+
+    private static boolean isListPostPath(String apiPath) {
+        return "/api/cnaps/vouchers/query".equals(apiPath)
+            || "/api/cnaps/vouchers/review-list".equals(apiPath);
+    }
+
+    private static boolean isRejectedGetPath(String apiPath) {
+        return "/api/cnaps/vouchers".equals(apiPath)
+            || "/api/cnaps/vouchers/query".equals(apiPath)
+            || "/api/cnaps/vouchers/review-list".equals(apiPath);
+    }
+
+    private boolean validateListFilters(Map<String, Object> fields, HttpServletResponse response) throws IOException {
+        String validationError = RequestSupport.validateWorkDateFilter(fields);
+        if (validationError == null) {
+            return true;
+        }
+        JsonSupport.write(
+            response,
+            HttpServletResponse.SC_BAD_REQUEST,
+            ApiResponse.fail("2002", validationError)
+        );
+        return false;
     }
 }

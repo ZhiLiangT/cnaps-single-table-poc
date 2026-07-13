@@ -92,11 +92,10 @@ public class MockTuxedoClient implements TuxedoClient {
 
     @Override
     public TuxedoResponse call(String serviceName, TuxedoRequest request) {
-        if (("CNAPS4609Q".equals(serviceName) || "CNAPS5702Q".equals(serviceName))
-            && request.fields().containsKey("WORK_DATE")) {
-            String workDate = text(request, "WORK_DATE");
-            if (workDate != null && !workDate.isBlank() && !validWorkDate(workDate)) {
-                return TuxedoResponse.fail("2002", "工作日期格式错误");
+        if ("CNAPS4609Q".equals(serviceName) || "CNAPS5702Q".equals(serviceName)) {
+            TuxedoResponse validation = validateWorkDateFilter(request);
+            if (validation != null) {
+                return validation;
             }
         }
         return switch (serviceName) {
@@ -266,7 +265,9 @@ public class MockTuxedoClient implements TuxedoClient {
         int pageSize = pageSize(request);
         List<Map<String, Object>> matching = vouchers.values().stream()
             .filter(voucher -> matches(voucher, "STATUS", status, false))
-            .filter(voucher -> matches(voucher, "WORK_DATE", text(request, "WORK_DATE"), false))
+            .filter(voucher -> matches(voucher, "WORK_DATE", optionalText(request, "WORK_DATE"), false))
+            .filter(voucher -> matchesLowerWorkDate(voucher, optionalText(request, "START_WORK_DATE")))
+            .filter(voucher -> matchesUpperWorkDate(voucher, optionalText(request, "END_WORK_DATE")))
             .filter(voucher -> matches(voucher, "BRANCH_NO", text(request, "BRANCH_NO"), false))
             .filter(voucher -> matches(voucher, "SERIAL_NO", text(request, "SERIAL_NO"), false))
             .filter(voucher -> matches(voucher, "VOUCHER_NO", text(request, "VOUCHER_NO"), false))
@@ -424,6 +425,45 @@ public class MockTuxedoClient implements TuxedoClient {
 
     private boolean validWorkDate(String value) {
         return RequestSupport.isValidWorkDate(value);
+    }
+
+    private TuxedoResponse validateWorkDateFilter(TuxedoRequest request) {
+        String workDate = optionalText(request, "WORK_DATE");
+        String startWorkDate = optionalText(request, "START_WORK_DATE");
+        String endWorkDate = optionalText(request, "END_WORK_DATE");
+        if (!validOptionalWorkDate(workDate)
+            || !validOptionalWorkDate(startWorkDate)
+            || !validOptionalWorkDate(endWorkDate)) {
+            return TuxedoResponse.fail("2002", "工作日期格式错误");
+        }
+        if (workDate != null && (startWorkDate != null || endWorkDate != null)) {
+            return TuxedoResponse.fail("2002", "工作日期不能与起止日期同时使用");
+        }
+        if (startWorkDate != null
+            && endWorkDate != null
+            && startWorkDate.compareTo(endWorkDate) > 0) {
+            return TuxedoResponse.fail("2002", "开始工作日期不能晚于结束工作日期");
+        }
+        return null;
+    }
+
+    private boolean validOptionalWorkDate(String value) {
+        return value == null || validWorkDate(value);
+    }
+
+    private String optionalText(TuxedoRequest request, String key) {
+        String value = text(request, key);
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private boolean matchesLowerWorkDate(Map<String, Object> voucher, String startWorkDate) {
+        return startWorkDate == null
+            || String.valueOf(voucher.get("WORK_DATE")).compareTo(startWorkDate) >= 0;
+    }
+
+    private boolean matchesUpperWorkDate(Map<String, Object> voucher, String endWorkDate) {
+        return endWorkDate == null
+            || String.valueOf(voucher.get("WORK_DATE")).compareTo(endWorkDate) <= 0;
     }
 
     private void touch(Map<String, Object> voucher, TuxedoRequest request) {

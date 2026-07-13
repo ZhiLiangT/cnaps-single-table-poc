@@ -271,6 +271,12 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void tuxedoRuntimeDefaultsOracleOciClientToAl32Utf8() throws Exception {
+        assertThat(Files.readString(root.resolve("conf/tuxedo.env")))
+            .contains("export NLS_LANG=${NLS_LANG:-AMERICAN_AMERICA.AL32UTF8}");
+    }
+
+    @Test
     void deploymentArtifactsConfigureTheServerOperatorAndBranch() throws Exception {
         assertThat(Files.readString(root.resolve("conf/app.properties")))
             .contains(

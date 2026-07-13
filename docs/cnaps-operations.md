@@ -26,6 +26,19 @@ WebFE/Tomcat -> Jolt -> Tuxedo C 服务 -> OCI -> Oracle XE
 
 sudo 密码只在终端需要时交互输入，不写入脚本或提示词。
 
+### 2.1 Oracle OCI 中文字符集
+
+`conf/tuxedo.env` 默认导出 `NLS_LANG=AMERICAN_AMERICA.AL32UTF8`。Tuxedo 启动脚本和 systemd 开机服务都会在 `tmboot` 前加载该文件，使 JSL、JSH、业务 C 服务及 OCI 会话继承 UTF-8 客户端字符集。不要只在交互式终端临时设置该变量，否则服务重启后会再次丢失。
+
+修改该配置后必须重启 Tuxedo，并确认业务服务进程环境：
+
+```bash
+p=$(pgrep -x cnapspocsvr | head -1)
+tr '\0' '\n' < "/proc/$p/environ" | grep '^NLS_LANG=AMERICAN_AMERICA.AL32UTF8$'
+```
+
+历史记录中已经变成 `U+FFFD` 或 `?` 的内容无法从替换字符还原，必须依据原始凭证重新录入或人工修正。
+
 ## 3. 自动化命令
 
 进入项目：

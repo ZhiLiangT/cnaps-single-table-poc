@@ -1,6 +1,6 @@
 # CNAPS 单表 POC API 与数据库表结构文档
 
-版本日期：2026-07-08
+版本日期：2026-07-13（列表查询改为 POST JSON Body）
 
 适用范围：当前 `cnaps-single-table-poc` Tomcat WebFE WAR 实现。
 

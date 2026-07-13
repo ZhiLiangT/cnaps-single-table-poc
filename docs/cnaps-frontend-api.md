@@ -1,6 +1,6 @@
 # 老式银行 Tuxedo 后端模拟系统 API 文档
 
-> 文档版本：v0.4 单表 POC 版<br>
+> 文档版本：v0.5 单表 POC 版<br>
 > 编写日期：2026-07-13<br>
 > 适用项目：`ruisui-bank-sim`<br>
 > 目标环境：Linux + Oracle Tuxedo + Oracle Database + WebFE<br>
@@ -11,6 +11,8 @@
 ## 1. 文档说明
 
 本文档定义单表 POC 阶段 WebFE 对外暴露的完整 HTTP API，是当前项目唯一的公共接口契约。
+
+v0.5 变更：通用查询和待复核列表查询改为 POST JSON Body；旧 GET 列表接口直接停用并返回 HTTP 405。
 
 核心调用链路：
 

@@ -372,7 +372,7 @@ class DeploymentArtifactTest {
 
         assertThat(api).contains(
             "# 老式银行 Tuxedo 后端模拟系统 API 文档",
-            "文档版本：v0.4 单表 POC 版",
+            "文档版本：v0.5 单表 POC 版",
             "编写日期：2026-07-13",
             "## 1. 文档说明",
             "## 2. 基础约定",
@@ -389,6 +389,8 @@ class DeploymentArtifactTest {
             "### 成功响应示例",
             "### 响应字段说明"
         );
+
+        assertThat(api).contains("v0.5 变更", "列表查询改为 POST JSON Body");
 
         for (String endpoint : List.of(
             "GET /api/health",

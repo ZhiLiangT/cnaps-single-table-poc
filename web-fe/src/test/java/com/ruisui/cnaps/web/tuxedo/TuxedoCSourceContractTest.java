@@ -304,7 +304,7 @@ class TuxedoCSourceContractTest {
     }
 
     @Test
-    void nativeQueriesStrictlyValidateWorkDateBeforeDatabaseAccess() throws Exception {
+    void nativeQueriesStrictlyValidateRangeDatesBeforeDatabaseAccess() throws Exception {
         String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_service.h"));
         String validation = Files.readString(root.resolve("tuxedo-server/src/common/validation_helper.c"));
         String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
@@ -312,10 +312,14 @@ class TuxedoCSourceContractTest {
         assertThat(header).contains("int cnaps_valid_work_date(const char *value);");
         assertThat(validation).contains("cnaps_valid_work_date", "days_by_month", "year % 400");
         assertThat(query).contains(
-            "raw_work_date[0] != '\\0' && !cnaps_valid_work_date(raw_work_date)",
-            "cnaps_return_error(rqst, \"2002\", \"invalid work date\")"
+            "raw_start_work_date[0] != '\\0' && !cnaps_valid_work_date(raw_start_work_date)",
+            "raw_end_work_date[0] != '\\0' && !cnaps_valid_work_date(raw_end_work_date)",
+            "cnaps_return_error(rqst, \"2002\", \"invalid start work date\")",
+            "cnaps_return_error(rqst, \"2002\", \"invalid end work date\")"
         );
-        assertThat(query.indexOf("cnaps_valid_work_date(raw_work_date)"))
+        assertThat(query.indexOf("cnaps_valid_work_date(raw_start_work_date)"))
+            .isLessThan(query.indexOf("db_query_vouchers("));
+        assertThat(query.indexOf("cnaps_valid_work_date(raw_end_work_date)"))
             .isLessThan(query.indexOf("db_query_vouchers("));
     }
 
@@ -326,25 +330,40 @@ class TuxedoCSourceContractTest {
         String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_db.h"));
         String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
         String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+        String headerQuery = header.substring(
+            header.indexOf("int db_query_vouchers("),
+            header.indexOf("int db_next_serial_no(")
+        );
+        String dbQuery = db.substring(
+            db.indexOf("int db_query_vouchers("),
+            db.indexOf("int db_next_serial_no(")
+        );
 
         assertThat(fields).contains("CNAPS_F_START_WORK_DATE", "CNAPS_F_END_WORK_DATE");
         assertThat(fml).contains("START_WORK_DATE", "END_WORK_DATE");
-        assertThat(header).contains("const char *start_work_date", "const char *end_work_date");
-        assertThat(query).contains(
-            "CNAPS_F_START_WORK_DATE", "CNAPS_F_END_WORK_DATE",
-            "cnaps_valid_work_date(raw_start_work_date)",
-            "cnaps_valid_work_date(raw_end_work_date)",
-            "work date cannot be combined with range",
-            "start work date is after end work date"
-        );
+        assertThat(headerQuery)
+            .contains("const char *start_work_date", "const char *end_work_date")
+            .doesNotContain("const char *work_date,");
+        assertThat(query)
+            .contains(
+                "CNAPS_F_START_WORK_DATE", "CNAPS_F_END_WORK_DATE",
+                "cnaps_valid_work_date(raw_start_work_date)",
+                "cnaps_valid_work_date(raw_end_work_date)",
+                "start work date is after end work date"
+            )
+            .doesNotContain(
+                "get_field(fbfr, CNAPS_F_WORK_DATE",
+                "work date cannot be combined with range",
+                "char raw_work_date[513]",
+                "char work_date[11]"
+            );
         assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_START_WORK_DATE")).isEqualTo(2);
         assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_END_WORK_DATE")).isEqualTo(2);
-        assertThat(query.indexOf("work date cannot be combined with range"))
-            .isLessThan(query.indexOf("db_query_vouchers("));
         assertThat(db).contains(
             "(:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD'))",
             "(:end_work_date IS NULL OR WORK_DATE<TO_DATE(:end_work_date, 'YYYY-MM-DD')+1)"
         );
+        assertThat(dbQuery).doesNotContain(":work_date");
         assertThat(countOccurrences(db, "bind_text(stmt, \":start_work_date\", start_work_date)")).isEqualTo(2);
         assertThat(countOccurrences(db, "bind_text(stmt, \":end_work_date\", end_work_date)")).isEqualTo(2);
     }
@@ -383,9 +402,10 @@ class TuxedoCSourceContractTest {
         ).doesNotContain(
             "overlay_field(fbfr, CNAPS_F_WORK_DATE, row.work_date, sizeof(row.work_date))"
         );
-        assertThat(countOccurrences(query, "char raw_work_date[513]")).isEqualTo(2);
-        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_work_date)")).isEqualTo(2);
-        assertThat(countOccurrences(query, "snprintf(work_date, sizeof(work_date), \"%s\", raw_work_date)")).isEqualTo(2);
+        assertThat(countOccurrences(query, "char raw_start_work_date[513]")).isEqualTo(2);
+        assertThat(countOccurrences(query, "char raw_end_work_date[513]")).isEqualTo(2);
+        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_start_work_date)")).isEqualTo(2);
+        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_end_work_date)")).isEqualTo(2);
     }
 
     @Test

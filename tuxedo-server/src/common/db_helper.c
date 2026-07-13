@@ -350,8 +350,7 @@ static int define_long(OCIStmt *stmt, int position, long *value, sb2 *indicator)
     "NVL(TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS'), ''), NVL(VERSION_NO, 1) "
 
 #define CNAPS_QUERY_PREDICATES \
-    "WHERE (:work_date IS NULL OR WORK_DATE=TO_DATE(:work_date, 'YYYY-MM-DD')) " \
-    "AND (:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD')) " \
+    "WHERE (:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD')) " \
     "AND (:end_work_date IS NULL OR WORK_DATE<TO_DATE(:end_work_date, 'YYYY-MM-DD')+1) " \
     "AND (:branch_no IS NULL OR BRANCH_NO=:branch_no) " \
     "AND (:status IS NULL OR STATUS=:status) " \
@@ -473,7 +472,6 @@ define_error:
 }
 
 int db_query_vouchers(
-    const char *work_date,
     const char *start_work_date,
     const char *end_work_date,
     const char *branch_no,
@@ -517,8 +515,7 @@ int db_query_vouchers(
     if (row_capacity > 0 && page_size > row_capacity) page_size = row_capacity;
 
     if (prepare_stmt(count_sql, &stmt) != 0) return -1;
-    if (bind_text(stmt, ":work_date", work_date) != 0
-        || bind_text(stmt, ":start_work_date", start_work_date) != 0
+    if (bind_text(stmt, ":start_work_date", start_work_date) != 0
         || bind_text(stmt, ":end_work_date", end_work_date) != 0
         || bind_text(stmt, ":branch_no", branch_no) != 0
         || bind_text(stmt, ":status", status_filter) != 0
@@ -541,8 +538,7 @@ int db_query_vouchers(
     offset_rows = ((long)page_no - 1L) * (long)page_size;
     page_size_value = page_size;
     if (prepare_stmt(page_sql, &stmt) != 0) return -1;
-    if (bind_text(stmt, ":work_date", work_date) != 0
-        || bind_text(stmt, ":start_work_date", start_work_date) != 0
+    if (bind_text(stmt, ":start_work_date", start_work_date) != 0
         || bind_text(stmt, ":end_work_date", end_work_date) != 0
         || bind_text(stmt, ":branch_no", branch_no) != 0
         || bind_text(stmt, ":status", status_filter) != 0

@@ -57,7 +57,6 @@ int db_insert_voucher(const cnaps_voucher_row *row);
 int db_update_voucher(const cnaps_voucher_row *row);
 int db_find_voucher(const char *bill_id, cnaps_voucher_row *row);
 int db_query_vouchers(
-    const char *work_date,
     const char *start_work_date,
     const char *end_work_date,
     const char *branch_no,

@@ -1,5 +1,6 @@
 package com.ruisui.cnaps.web.tuxedo;
 
+import bea.jolt.JoltRemoteService;
 import bea.jolt.JoltSessionAttributes;
 import com.ruisui.cnaps.web.dto.ApiResponse;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,42 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JoltTuxedoClientTest {
+    @Test
+    void omitsOperatorNoFromPagedVoucherQueryRequests() {
+        for (String serviceName : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+            JoltRemoteService.reset();
+            TuxedoResponse response = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"))
+                .call(
+                    serviceName,
+                    new TuxedoRequest(Map.of(
+                        "OPERATOR_NO", "77210021",
+                        "WORK_DATE", "2026-07-13"
+                    ))
+                );
+
+            assertThat(response.success()).as(serviceName).isTrue();
+            assertThat(JoltRemoteService.lastStrings()).as(serviceName)
+                .containsEntry("WORK_DATE", "2026-07-13")
+                .doesNotContainKey("OPERATOR_NO");
+        }
+    }
+
+    @Test
+    void keepsOperatorNoInNonListRequests() {
+        JoltRemoteService.reset();
+        TuxedoResponse response = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"))
+            .call(
+                "CNAPS5702I",
+                new TuxedoRequest(Map.of(
+                    "OPERATOR_NO", "77210021",
+                    "BILL_ID", "BILL-1"
+                ))
+            );
+
+        assertThat(response.success()).isTrue();
+        assertThat(JoltRemoteService.lastStrings()).containsEntry("OPERATOR_NO", "77210021");
+    }
+
     @Test
     void convertsConfiguredMillisecondTimeoutToCeilingJoltSeconds() {
         JoltSessionAttributes.reset();

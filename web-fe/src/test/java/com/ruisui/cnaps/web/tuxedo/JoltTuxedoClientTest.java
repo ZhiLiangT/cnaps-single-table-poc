@@ -160,9 +160,9 @@ class JoltTuxedoClientTest {
     }
 
     @Test
-    void writesMetadataLongFieldsThroughSetLong() throws Exception {
+    void writesMetadataIntegerFieldsThroughSetInt() throws Exception {
         JoltTuxedoClient client = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"));
-        FakeLongSetter remoteService = new FakeLongSetter();
+        FakeIntSetter remoteService = new FakeIntSetter();
         Method putField = JoltTuxedoClient.class.getDeclaredMethod(
             "putField",
             Class.class,
@@ -172,10 +172,10 @@ class JoltTuxedoClientTest {
         );
         putField.setAccessible(true);
 
-        putField.invoke(client, FakeLongSetter.class, remoteService, "PAGE_NO", "2147483648");
+        putField.invoke(client, FakeIntSetter.class, remoteService, "PAGE_NO", "100");
 
         assertThat(remoteService.fieldName).isEqualTo("PAGE_NO");
-        assertThat(remoteService.value).isEqualTo(2147483648L);
+        assertThat(remoteService.value).isEqualTo(100);
     }
 
     @Test
@@ -228,16 +228,16 @@ class JoltTuxedoClientTest {
             return "VERSION_NO".equals(fieldName) ? defaultValue : "value-" + fieldName;
         }
 
-        public long getLongDef(String fieldName, long defaultValue) {
-            return "VERSION_NO".equals(fieldName) ? 7L : defaultValue;
+        public int getIntDef(String fieldName, int defaultValue) {
+            return "VERSION_NO".equals(fieldName) ? 7 : defaultValue;
         }
     }
 
-    public static final class FakeLongSetter {
+    public static final class FakeIntSetter {
         private String fieldName;
-        private long value;
+        private int value;
 
-        public void setLong(String fieldName, long value) {
+        public void setInt(String fieldName, int value) {
             this.fieldName = fieldName;
             this.value = value;
         }

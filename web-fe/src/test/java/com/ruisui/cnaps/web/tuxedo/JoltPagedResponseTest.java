@@ -42,7 +42,7 @@ class JoltPagedResponseTest {
     }
 
     @Test
-    void shapesRepeatedDictionaryLongFieldsWithoutIntApis() throws Exception {
+    void shapesRepeatedDictionaryIntegerMetadataFields() throws Exception {
         JoltTuxedoClient client = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"));
         Method method = JoltTuxedoClient.class.getDeclaredMethod(
             "readResponseFields",
@@ -69,11 +69,11 @@ class JoltPagedResponseTest {
     }
 
     public static final class FakePagedService {
-        public long getLongDef(String name, long defaultValue) {
+        public int getIntDef(String name, int defaultValue) {
             return switch (name) {
-                case "PAGE_NO" -> 1L;
-                case "PAGE_SIZE" -> 10L;
-                case "TOTAL_ELEMENTS" -> 2L;
+                case "PAGE_NO" -> 1;
+                case "PAGE_SIZE" -> 10;
+                case "TOTAL_ELEMENTS" -> 2;
                 default -> defaultValue;
             };
         }
@@ -88,8 +88,8 @@ class JoltPagedResponseTest {
             return defaultValue;
         }
 
-        public long getLongItemDef(String name, int occurrence, long defaultValue) {
-            return "VERSION_NO".equals(name) && occurrence < 2 ? occurrence + 1L : defaultValue;
+        public int getIntItemDef(String name, int occurrence, int defaultValue) {
+            return "VERSION_NO".equals(name) && occurrence < 2 ? occurrence + 1 : defaultValue;
         }
     }
 
@@ -104,8 +104,8 @@ class JoltPagedResponseTest {
             return defaultValue;
         }
 
-        public long getLongItemDef(String name, int occurrence, long defaultValue) {
-            return "SORT_NO".equals(name) && occurrence < 2 ? occurrence + 1L : defaultValue;
+        public int getIntItemDef(String name, int occurrence, int defaultValue) {
+            return "SORT_NO".equals(name) && occurrence < 2 ? occurrence + 1 : defaultValue;
         }
     }
 }

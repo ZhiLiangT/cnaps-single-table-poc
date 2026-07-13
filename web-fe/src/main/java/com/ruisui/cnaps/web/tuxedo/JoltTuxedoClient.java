@@ -167,9 +167,15 @@ public class JoltTuxedoClient implements TuxedoClient {
         }
         String text = stringValue(value);
         if (NUMERIC_FIELDS.contains(name) && isLong(text)) {
+            long numericValue = Long.parseLong(text);
+            Method setInt = method(remoteServiceClass, "setInt", String.class, int.class);
+            if (setInt != null && numericValue >= Integer.MIN_VALUE && numericValue <= Integer.MAX_VALUE) {
+                setInt.invoke(remoteService, name, (int)numericValue);
+                return;
+            }
             Method setLong = method(remoteServiceClass, "setLong", String.class, long.class);
             if (setLong != null) {
-                setLong.invoke(remoteService, name, Long.parseLong(text));
+                setLong.invoke(remoteService, name, numericValue);
                 return;
             }
         }
@@ -290,6 +296,21 @@ public class JoltTuxedoClient implements TuxedoClient {
             ? null
             : invokeGetterOrNull(stringMethod, remoteService, fieldName, occurrence, null);
         if (value == null && NUMERIC_FIELDS.contains(fieldName)) {
+            Method intMethod = method(
+                remoteServiceClass,
+                "getIntItemDef",
+                String.class,
+                int.class,
+                int.class
+            );
+            value = intMethod == null
+                ? null
+                : invokeGetterOrNull(intMethod, remoteService, fieldName, occurrence, Integer.MIN_VALUE);
+            if (Integer.valueOf(Integer.MIN_VALUE).equals(value)) {
+                value = null;
+            }
+        }
+        if (value == null && NUMERIC_FIELDS.contains(fieldName)) {
             Method longMethod = method(
                 remoteServiceClass,
                 "getLongItemDef",
@@ -306,6 +327,9 @@ public class JoltTuxedoClient implements TuxedoClient {
         }
         if (value instanceof String text && NUMERIC_FIELDS.contains(fieldName) && isLong(text)) {
             return Long.parseLong(text);
+        }
+        if (value instanceof Number number && NUMERIC_FIELDS.contains(fieldName)) {
+            return number.longValue();
         }
         return value;
     }
@@ -343,6 +367,13 @@ public class JoltTuxedoClient implements TuxedoClient {
 
     private Object getLong(Class<?> remoteServiceClass, Object remoteService, String fieldName)
         throws ReflectiveOperationException {
+        Method intMethod = method(remoteServiceClass, "getIntDef", String.class, int.class);
+        if (intMethod != null) {
+            Object result = invokeGetterOrNull(intMethod, remoteService, fieldName, Integer.MIN_VALUE);
+            if (result instanceof Number value && value.intValue() != Integer.MIN_VALUE) {
+                return value.longValue();
+            }
+        }
         Method method = method(remoteServiceClass, "getLongDef", String.class, long.class);
         if (method != null) {
             Object result = invokeGetterOrNull(method, remoteService, fieldName, Long.MIN_VALUE);

@@ -51,17 +51,22 @@ public class TuxedoRequestMapper {
         if ("GET".equals(verb) && "/api/banks".equals(cleanPath)) {
             return "BANKQRY";
         }
-        if ("/api/cnaps/vouchers".equals(cleanPath)) {
-            return "POST".equals(verb) ? "CNAPS5701E" : "CNAPS4609Q";
+        if ("POST".equals(verb) && "/api/cnaps/vouchers".equals(cleanPath)) {
+            return "CNAPS5701E";
         }
-        if ("GET".equals(verb) && "/api/cnaps/vouchers/review-list".equals(cleanPath)) {
+        if ("POST".equals(verb) && "/api/cnaps/vouchers/query".equals(cleanPath)) {
+            return "CNAPS4609Q";
+        }
+        if ("POST".equals(verb) && "/api/cnaps/vouchers/review-list".equals(cleanPath)) {
             return "CNAPS5702Q";
         }
         if (cleanPath.startsWith("/api/cnaps/vouchers/")) {
             if ("PUT".equals(verb)) {
                 return "CNAPS5701U";
             }
-            if ("GET".equals(verb)) {
+            if ("GET".equals(verb)
+                && !"/api/cnaps/vouchers/query".equals(cleanPath)
+                && !"/api/cnaps/vouchers/review-list".equals(cleanPath)) {
                 return "CNAPS5702I";
             }
             if ("POST".equals(verb) && cleanPath.endsWith("/delete")) {

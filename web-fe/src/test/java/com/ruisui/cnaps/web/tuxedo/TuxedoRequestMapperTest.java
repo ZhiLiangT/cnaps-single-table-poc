@@ -2,9 +2,11 @@ package com.ruisui.cnaps.web.tuxedo;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TuxedoRequestMapperTest {
     private final TuxedoRequestMapper mapper = new TuxedoRequestMapper();
@@ -15,13 +17,26 @@ class TuxedoRequestMapperTest {
         assertThat(mapper.serviceName("GET", "/api/dicts/BUSINESS_TYPE")).isEqualTo("DICTQRY");
         assertThat(mapper.serviceName("GET", "/api/banks")).isEqualTo("BANKQRY");
         assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers")).isEqualTo("CNAPS5701E");
-        assertThat(mapper.serviceName("GET", "/api/cnaps/vouchers")).isEqualTo("CNAPS4609Q");
-        assertThat(mapper.serviceName("GET", "/api/cnaps/vouchers/review-list")).isEqualTo("CNAPS5702Q");
+        assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/query")).isEqualTo("CNAPS4609Q");
+        assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/review-list")).isEqualTo("CNAPS5702Q");
         assertThat(mapper.serviceName("GET", "/api/cnaps/vouchers/B202607087720002000")).isEqualTo("CNAPS5702I");
         assertThat(mapper.serviceName("PUT", "/api/cnaps/vouchers/B202607087720002000")).isEqualTo("CNAPS5701U");
         assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/B202607087720002000/delete")).isEqualTo("CNAPS5701D");
         assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/B202607087720002000/review-pass")).isEqualTo("CNAPS5702A");
         assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/B202607087720002000/review-return")).isEqualTo("CNAPS5702R");
+    }
+
+    @Test
+    void rejectsRetiredVoucherListGetMappings() {
+        for (String path : List.of(
+            "/api/cnaps/vouchers",
+            "/api/cnaps/vouchers/query",
+            "/api/cnaps/vouchers/review-list"
+        )) {
+            assertThatThrownBy(() -> mapper.serviceName("GET", path))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unsupported WebFE operation");
+        }
     }
 
     @Test

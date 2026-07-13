@@ -282,9 +282,11 @@ class DeploymentArtifactTest {
                 "POC_BRANCH_NO",
                 "webfe.poc.operatorNo",
                 "workDate",
+                "startWorkDate",
+                "endWorkDate",
                 "创建时必填",
                 "修改时可选",
-                "工作日期过滤；未传时默认当前日期。",
+                "均未传时不按工作日期筛选",
                 "修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。")
             .doesNotContain(
                 "### 1.4 公共请求头",

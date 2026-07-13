@@ -66,7 +66,7 @@ WebFE 自动完成：
 
 | 类型 | 格式 | 示例 | 说明 |
 |---|---|---|---|
-| 日期 | `yyyy-MM-dd` | `2026-07-13` | 录入 Body 必填；修改 Body 可选；列表 Query 可选 |
+| 日期 | `yyyy-MM-dd` | `2026-07-13` | 录入 Body 必填；修改 Body 可选；列表 Body 可选 |
 | 时间 | `yyyy-MM-dd HH:mm:ss` | `2026-07-13 09:30:25` | 响应中的操作时间 |
 | 金额 | 字符串，最多两位小数 | `5600.00` | 避免 JSON 浮点精度问题 |
 | 编码 | UTF-8 | 中文地址、名称 | WebFE、Tuxedo 和 Oracle 客户端需使用兼容字符集 |
@@ -75,7 +75,7 @@ WebFE 自动完成：
 
 - 录入接口：`workDate` 在 JSON Body 中必填。
 - 修改接口：`workDate` 在 JSON Body 中可选，未传时保持原值。
-- 通用查询和待复核查询：`workDate`、`startWorkDate`、`endWorkDate` 为可选 Query 参数，均未传时不按工作日期筛选。
+- 通用查询和待复核查询：`workDate`、`startWorkDate`、`endWorkDate` 为可选 JSON Body 字段，均未传时不按工作日期筛选。
 - 详情、删除和复核接口：只使用 Path 中的 `billId`，不需要工作日期。
 
 概括而言，`workDate` 创建时必填，修改时可选。列表可按 `workDate` 精确过滤，或按起止工作日期范围过滤；未传日期参数时查询全部工作日期。修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。
@@ -137,11 +137,13 @@ WebFE 自动完成：
 | `POST /api/cnaps/vouchers` | `CNAPS5701E` | 是 | 单据录入 |
 | `PUT /api/cnaps/vouchers/{billId}` | `CNAPS5701U` | 是 | 单据修改 |
 | `POST /api/cnaps/vouchers/{billId}/delete` | `CNAPS5701D` | 是 | 逻辑删除 |
-| `GET /api/cnaps/vouchers` | `CNAPS4609Q` | 否 | 通用查询 |
-| `GET /api/cnaps/vouchers/review-list` | `CNAPS5702Q` | 否 | 待复核查询 |
+| `POST /api/cnaps/vouchers/query` | `CNAPS4609Q` | 否 | 通用查询 |
+| `POST /api/cnaps/vouchers/review-list` | `CNAPS5702Q` | 否 | 待复核查询 |
 | `GET /api/cnaps/vouchers/{billId}` | `CNAPS5702I` | 否 | 单据详情 |
 | `POST /api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` | 是 | 复核通过 |
 | `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` | 是 | 复核退回 |
+
+原列表接口 `GET /api/cnaps/vouchers` 和 `GET /api/cnaps/vouchers/review-list` 已停用，调用时返回 HTTP 405。
 
 ---
 
@@ -579,7 +581,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B20260713
 ### 基本信息
 
 ```http
-GET /api/cnaps/vouchers
+POST /api/cnaps/vouchers/query
 ```
 
 | 项目 | 内容 |
@@ -588,7 +590,7 @@ GET /api/cnaps/vouchers
 | 是否写库 | 否 |
 | 用途 | 按工作日期、状态和单据信息分页查询 |
 
-### Query 参数
+### Body 参数
 
 | 参数 | 类型 | 必输 | 默认值 | 说明 |
 |---|---:|:---:|---:|---|
@@ -607,7 +609,15 @@ GET /api/cnaps/vouchers
 ### 请求示例
 
 ```bash
-curl -X GET "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers?startWorkDate=2026-07-10&endWorkDate=2026-07-13&status=10_PENDING_REVIEW&pageNo=1&pageSize=10"
+curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/query" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{
+    "startWorkDate": "2026-07-10",
+    "endWorkDate": "2026-07-13",
+    "status": "10_PENDING_REVIEW",
+    "pageNo": 1,
+    "pageSize": 10
+  }'
 ```
 
 `startWorkDate` 和 `endWorkDate` 均包含边界，可单独使用；`workDate` 不得与日期范围参数同时使用。三个日期参数都不传或仅传空白值时，不按工作日期筛选。日期格式非法、日期不存在、参数混用或开始日期晚于结束日期时返回 `2002`。
@@ -655,7 +665,7 @@ curl -X GET "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers?startWorkD
 ### 基本信息
 
 ```http
-GET /api/cnaps/vouchers/review-list
+POST /api/cnaps/vouchers/review-list
 ```
 
 | 项目 | 内容 |
@@ -664,7 +674,7 @@ GET /api/cnaps/vouchers/review-list
 | 是否写库 | 否 |
 | 固定状态 | `10_PENDING_REVIEW` |
 
-### Query 参数
+### Body 参数
 
 | 参数 | 类型 | 必输 | 默认值 | 说明 |
 |---|---:|:---:|---:|---|
@@ -678,7 +688,13 @@ GET /api/cnaps/vouchers/review-list
 ### 请求示例
 
 ```bash
-curl -X GET "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/review-list?startWorkDate=2026-07-10&pageNo=1&pageSize=10"
+curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/review-list" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{
+    "startWorkDate": "2026-07-10",
+    "pageNo": 1,
+    "pageSize": 10
+  }'
 ```
 
 日期筛选规则与通用查询一致：范围边界包含，可只传一端，`workDate` 与范围参数互斥，三个日期参数都不传或仅传空白值时查询全部工作日期。非法日期或非法参数组合返回 `2002`。
@@ -981,7 +997,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B20260713
 ```text
 1. GET  /api/health
 2. POST /api/cnaps/vouchers
-3. GET  /api/cnaps/vouchers/review-list
+3. POST /api/cnaps/vouchers/review-list
 4. GET  /api/cnaps/vouchers/{billId}
 5. POST /api/cnaps/vouchers/{billId}/review-pass
 6. GET  /api/cnaps/vouchers/{billId}
@@ -1006,7 +1022,7 @@ curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/B20260713
 ```text
 1. POST /api/cnaps/vouchers
 2. POST /api/cnaps/vouchers/{billId}/delete
-3. GET  /api/cnaps/vouchers?workDate=2026-07-13&includeDeleted=true&pageNo=1&pageSize=10
+3. POST /api/cnaps/vouchers/query（Body: workDate、includeDeleted、pageNo、pageSize）
 4. GET  /api/cnaps/vouchers/{billId}
 ```
 

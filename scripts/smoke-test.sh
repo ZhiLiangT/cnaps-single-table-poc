@@ -30,7 +30,9 @@ if [ -z "$bill_id" ]; then
   exit 1
 fi
 
-curl -fsS "$BASE_URL/api/cnaps/vouchers?status=10_PENDING_REVIEW"
+curl -fsS -X POST "$BASE_URL/api/cnaps/vouchers/query" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{"status":"10_PENDING_REVIEW"}'
 curl -fsS "$BASE_URL/api/cnaps/vouchers/$bill_id"
 curl -fsS -X PUT "$BASE_URL/api/cnaps/vouchers/$bill_id" \
   -H "Content-Type: application/json; charset=UTF-8" \

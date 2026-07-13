@@ -328,15 +328,15 @@ class DeploymentArtifactTest {
             "| `POST /api/cnaps/vouchers` | `CNAPS5701E` |",
             "| `PUT /api/cnaps/vouchers/{billId}` | `CNAPS5701U` |",
             "| `POST /api/cnaps/vouchers/{billId}/delete` | `CNAPS5701D` |",
-            "| `GET /api/cnaps/vouchers` | `CNAPS4609Q` |",
-            "| `GET /api/cnaps/vouchers/review-list` | `CNAPS5702Q` |",
+            "| `POST /api/cnaps/vouchers/query` | `CNAPS4609Q` |",
+            "| `POST /api/cnaps/vouchers/review-list` | `CNAPS5702Q` |",
             "| `GET /api/cnaps/vouchers/{billId}` | `CNAPS5702I` |",
             "| `POST /api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` |",
             "| `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` |"
         );
 
         assertThat(Pattern.compile("(?m)^## 6\\.\\d+ ").matcher(api).results()).hasSize(11);
-        assertThat(countOccurrences(api, "-H \"Content-Type: application/json; charset=UTF-8\"")).isEqualTo(5);
+        assertThat(countOccurrences(api, "-H \"Content-Type: application/json; charset=UTF-8\"")).isEqualTo(7);
 
         String errorCodeTable = api.substring(api.indexOf("## 8. 错误码"), api.indexOf("错误响应示例："));
         List<String> activeErrorCodes = Pattern.compile("(?m)^\\| `(\\d{4})` \\|")
@@ -397,8 +397,8 @@ class DeploymentArtifactTest {
             "POST /api/cnaps/vouchers",
             "PUT /api/cnaps/vouchers/{billId}",
             "POST /api/cnaps/vouchers/{billId}/delete",
-            "GET /api/cnaps/vouchers",
-            "GET /api/cnaps/vouchers/review-list",
+            "POST /api/cnaps/vouchers/query",
+            "POST /api/cnaps/vouchers/review-list",
             "GET /api/cnaps/vouchers/{billId}",
             "POST /api/cnaps/vouchers/{billId}/review-pass",
             "POST /api/cnaps/vouchers/{billId}/review-return"
@@ -418,6 +418,35 @@ class DeploymentArtifactTest {
             "-H \"workDate:",
             "?page=", "&size="
         );
+    }
+
+    @Test
+    void voucherListCallersUsePostJsonBodies() throws Exception {
+        String script = Files.readString(root.resolve("web-fe/src/main/webapp/static/js/cnaps.js"));
+        String smoke = Files.readString(root.resolve("scripts/smoke-test.sh"));
+        String frontendApi = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
+        String databaseApi = Files.readString(root.resolve("docs/cnaps-api-database.md"));
+
+        assertThat(script)
+            .contains("fetch(\"api/cnaps/vouchers/query\"", "method: \"POST\"", "JSON.stringify(body)")
+            .doesNotContain("api/cnaps/vouchers?");
+        assertThat(smoke)
+            .contains("/api/cnaps/vouchers/query", "-X POST", "Content-Type: application/json")
+            .doesNotContain("/api/cnaps/vouchers?status=");
+        assertThat(frontendApi)
+            .contains("POST /api/cnaps/vouchers/query", "POST /api/cnaps/vouchers/review-list")
+            .doesNotContain(
+                "| `GET /api/cnaps/vouchers` |",
+                "| `GET /api/cnaps/vouchers/review-list` |",
+                "curl -X GET \"http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers?"
+            );
+        assertThat(databaseApi)
+            .contains("POST /api/cnaps/vouchers/query", "POST /api/cnaps/vouchers/review-list")
+            .doesNotContain(
+                "GET /api/cnaps/vouchers?",
+                "GET /api/cnaps/vouchers/review-list",
+                "curl \"http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers?"
+            );
     }
 
     @Test

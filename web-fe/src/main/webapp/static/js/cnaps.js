@@ -23,8 +23,12 @@ document.querySelector("[data-create-form]")?.addEventListener("submit", async (
 
 document.querySelector("[data-query-form]")?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const params = new URLSearchParams(new FormData(event.currentTarget));
-  await show(await fetch(`api/cnaps/vouchers?${params}`));
+  const body = Object.fromEntries(new FormData(event.currentTarget).entries());
+  await show(await fetch("api/cnaps/vouchers/query", {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify(body)
+  }));
 });
 
 document.querySelector("[data-review-form]")?.addEventListener("submit", async (event) => {

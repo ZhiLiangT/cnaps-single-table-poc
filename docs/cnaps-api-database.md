@@ -313,7 +313,7 @@ GET /api/banks?bankNo={bankNo}&keyword={keyword}
 POST /api/cnaps/vouchers
 ```
 
-请求头：见“公共请求头”。
+请求头：`Content-Type: application/json; charset=UTF-8`。
 
 请求体示例：
 
@@ -396,22 +396,21 @@ POST /api/cnaps/vouchers
 ### 5.5 经办凭证查询
 
 ```http
-GET /api/cnaps/vouchers?status={status}&operatorNo={operatorNo}&serialNo={serialNo}&page={page}&size={size}
+POST /api/cnaps/vouchers/query
 ```
 
 请求头：见“公共请求头”。
 
-查询参数：
+JSON Body 参数：
 
 | 参数 | 必填 | 默认值 | 示例 | 说明 |
 | --- | --- | --- | --- | --- |
 | `status` | 否 | 无 | `10_PENDING_REVIEW` | 按状态过滤。 |
-| `operatorNo` | 否 | 无 | `77210021` | 按经办操作员过滤。 |
 | `serialNo` | 否 | 无 | `0002000` | 按流水号过滤。 |
-| `page` | 否 | `0` | `0` | 页码，小于 0 时按 0 处理。 |
-| `size` | 否 | `10` | `10` | 每页条数，小于等于 0 时按 10，最大 50。 |
+| `pageNo` | 否 | `1` | `1` | 页码，从 1 开始。 |
+| `pageSize` | 否 | `10` | `10` | 每页条数。 |
 
-查询范围默认使用 WebFE 内部上下文中的 `workDate` 和 `branchNo`；需要指定时可通过请求头覆盖。
+筛选条件全部通过 JSON Body 传递；未传工作日期字段时不按工作日期筛选。
 
 成功响应 `data` 为分页对象，核心结构如下：
 
@@ -442,19 +441,19 @@ GET /api/cnaps/vouchers?status={status}&operatorNo={operatorNo}&serialNo={serial
 ### 5.6 复核列表查询
 
 ```http
-GET /api/cnaps/vouchers/review-list?page={page}&size={size}
+POST /api/cnaps/vouchers/review-list
 ```
 
-请求头：见“公共请求头”。
+请求头：`Content-Type: application/json; charset=UTF-8`。
 
 说明：等价于按 `status=10_PENDING_REVIEW` 查询当前机构、当前工作日的待复核列表。
 
-查询参数：
+JSON Body 参数：
 
 | 参数 | 必填 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `page` | 否 | `0` | 页码。 |
-| `size` | 否 | `10` | 每页条数，最大 50。 |
+| `pageNo` | 否 | `1` | 页码，从 1 开始。 |
+| `pageSize` | 否 | `10` | 每页条数。 |
 
 响应结构同“经办凭证查询”。
 
@@ -963,7 +962,9 @@ curl -X POST http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers \
 ### 8.2 查询凭证
 
 ```bash
-curl "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers?status=10_PENDING_REVIEW&page=0&size=10"
+curl -X POST "http://localhost:8080/ruisui-bank-sim/api/cnaps/vouchers/query" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -d '{"status":"10_PENDING_REVIEW","pageNo":1,"pageSize":10}'
 ```
 
 ### 8.3 复核通过

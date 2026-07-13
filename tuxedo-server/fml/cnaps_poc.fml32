@@ -61,6 +61,8 @@ KEYWORD         12041   string
 PAYER_ADDRESS   12042   string
 PAYEE_ADDRESS   12043   string
 PAYER_BANK_NAME 12044   string
+START_WORK_DATE 12045   string
+END_WORK_DATE   12046   string
 PAGE_NO         13001   long
 PAGE_SIZE       13002   long
 TOTAL_ELEMENTS  13003   long

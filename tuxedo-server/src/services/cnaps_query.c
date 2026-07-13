@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "cnaps_db.h"
 #include "cnaps_fields.h"
 #include "cnaps_service.h"
@@ -19,6 +20,10 @@ void CNAPS4609Q(TPSVCINFO *rqst)
     cnaps_voucher_row rows[CNAPS_QUERY_MAX_ROWS];
     char work_date[11] = {0};
     char raw_work_date[513] = {0};
+    char start_work_date[11] = {0};
+    char raw_start_work_date[513] = {0};
+    char end_work_date[11] = {0};
+    char raw_end_work_date[513] = {0};
     char branch_no[13] = {0};
     char status[33] = {0};
     char serial_no[17] = {0};
@@ -36,6 +41,8 @@ void CNAPS4609Q(TPSVCINFO *rqst)
 
     cnaps_log_service_start("CNAPS4609Q");
     get_field(fbfr, CNAPS_F_WORK_DATE, raw_work_date, sizeof(raw_work_date));
+    get_field(fbfr, CNAPS_F_START_WORK_DATE, raw_start_work_date, sizeof(raw_start_work_date));
+    get_field(fbfr, CNAPS_F_END_WORK_DATE, raw_end_work_date, sizeof(raw_end_work_date));
     get_field(fbfr, CNAPS_F_BRANCH_NO, branch_no, sizeof(branch_no));
     get_field(fbfr, CNAPS_F_STATUS, status, sizeof(status));
     get_field(fbfr, CNAPS_F_SERIAL_NO, serial_no, sizeof(serial_no));
@@ -47,7 +54,27 @@ void CNAPS4609Q(TPSVCINFO *rqst)
         cnaps_return_error(rqst, "2002", "invalid work date");
         return;
     }
+    if (raw_start_work_date[0] != '\0' && !cnaps_valid_work_date(raw_start_work_date)) {
+        cnaps_return_error(rqst, "2002", "invalid start work date");
+        return;
+    }
+    if (raw_end_work_date[0] != '\0' && !cnaps_valid_work_date(raw_end_work_date)) {
+        cnaps_return_error(rqst, "2002", "invalid end work date");
+        return;
+    }
+    if (raw_work_date[0] != '\0'
+        && (raw_start_work_date[0] != '\0' || raw_end_work_date[0] != '\0')) {
+        cnaps_return_error(rqst, "2002", "work date cannot be combined with range");
+        return;
+    }
+    if (raw_start_work_date[0] != '\0' && raw_end_work_date[0] != '\0'
+        && strcmp(raw_start_work_date, raw_end_work_date) > 0) {
+        cnaps_return_error(rqst, "2002", "start work date is after end work date");
+        return;
+    }
     snprintf(work_date, sizeof(work_date), "%s", raw_work_date);
+    snprintf(start_work_date, sizeof(start_work_date), "%s", raw_start_work_date);
+    snprintf(end_work_date, sizeof(end_work_date), "%s", raw_end_work_date);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_NO, &page_no_value);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_SIZE, &page_size_value);
     page_no = page_no_value > 0 && page_no_value <= 2147483647L ? (int)page_no_value : 1;
@@ -59,6 +86,8 @@ void CNAPS4609Q(TPSVCINFO *rqst)
         || include_deleted_text[0] == 't';
     row_count = db_query_vouchers(
         work_date,
+        start_work_date,
+        end_work_date,
         branch_no,
         status,
         serial_no,
@@ -91,6 +120,10 @@ void CNAPS5702Q(TPSVCINFO *rqst)
     cnaps_voucher_row rows[CNAPS_QUERY_MAX_ROWS];
     char work_date[11] = {0};
     char raw_work_date[513] = {0};
+    char start_work_date[11] = {0};
+    char raw_start_work_date[513] = {0};
+    char end_work_date[11] = {0};
+    char raw_end_work_date[513] = {0};
     char branch_no[13] = {0};
     char serial_no[17] = {0};
     long page_no_value = 1;
@@ -102,13 +135,35 @@ void CNAPS5702Q(TPSVCINFO *rqst)
 
     cnaps_log_service_start("CNAPS5702Q");
     get_field(fbfr, CNAPS_F_WORK_DATE, raw_work_date, sizeof(raw_work_date));
+    get_field(fbfr, CNAPS_F_START_WORK_DATE, raw_start_work_date, sizeof(raw_start_work_date));
+    get_field(fbfr, CNAPS_F_END_WORK_DATE, raw_end_work_date, sizeof(raw_end_work_date));
     get_field(fbfr, CNAPS_F_BRANCH_NO, branch_no, sizeof(branch_no));
     get_field(fbfr, CNAPS_F_SERIAL_NO, serial_no, sizeof(serial_no));
     if (raw_work_date[0] != '\0' && !cnaps_valid_work_date(raw_work_date)) {
         cnaps_return_error(rqst, "2002", "invalid work date");
         return;
     }
+    if (raw_start_work_date[0] != '\0' && !cnaps_valid_work_date(raw_start_work_date)) {
+        cnaps_return_error(rqst, "2002", "invalid start work date");
+        return;
+    }
+    if (raw_end_work_date[0] != '\0' && !cnaps_valid_work_date(raw_end_work_date)) {
+        cnaps_return_error(rqst, "2002", "invalid end work date");
+        return;
+    }
+    if (raw_work_date[0] != '\0'
+        && (raw_start_work_date[0] != '\0' || raw_end_work_date[0] != '\0')) {
+        cnaps_return_error(rqst, "2002", "work date cannot be combined with range");
+        return;
+    }
+    if (raw_start_work_date[0] != '\0' && raw_end_work_date[0] != '\0'
+        && strcmp(raw_start_work_date, raw_end_work_date) > 0) {
+        cnaps_return_error(rqst, "2002", "start work date is after end work date");
+        return;
+    }
     snprintf(work_date, sizeof(work_date), "%s", raw_work_date);
+    snprintf(start_work_date, sizeof(start_work_date), "%s", raw_start_work_date);
+    snprintf(end_work_date, sizeof(end_work_date), "%s", raw_end_work_date);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_NO, &page_no_value);
     cnaps_get_long(fbfr, CNAPS_F_PAGE_SIZE, &page_size_value);
     page_no = page_no_value > 0 && page_no_value <= 2147483647L ? (int)page_no_value : 1;
@@ -117,6 +172,8 @@ void CNAPS5702Q(TPSVCINFO *rqst)
         : (page_size_value > CNAPS_QUERY_MAX_ROWS ? CNAPS_QUERY_MAX_ROWS : 10);
     row_count = db_query_vouchers(
         work_date,
+        start_work_date,
+        end_work_date,
         branch_no,
         CNAPS_STATUS_PENDING_REVIEW,
         serial_no,

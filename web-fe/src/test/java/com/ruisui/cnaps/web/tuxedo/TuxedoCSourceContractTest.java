@@ -285,6 +285,36 @@ class TuxedoCSourceContractTest {
     }
 
     @Test
+    void nativeVoucherQueriesSupportValidatedInclusiveWorkDateRanges() throws Exception {
+        String fields = Files.readString(root.resolve("tuxedo-server/include/cnaps_fields.h"));
+        String fml = Files.readString(root.resolve("tuxedo-server/fml/cnaps_poc.fml32"));
+        String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_db.h"));
+        String query = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_query.c"));
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+
+        assertThat(fields).contains("CNAPS_F_START_WORK_DATE", "CNAPS_F_END_WORK_DATE");
+        assertThat(fml).contains("START_WORK_DATE", "END_WORK_DATE");
+        assertThat(header).contains("const char *start_work_date", "const char *end_work_date");
+        assertThat(query).contains(
+            "CNAPS_F_START_WORK_DATE", "CNAPS_F_END_WORK_DATE",
+            "cnaps_valid_work_date(raw_start_work_date)",
+            "cnaps_valid_work_date(raw_end_work_date)",
+            "work date cannot be combined with range",
+            "start work date is after end work date"
+        );
+        assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_START_WORK_DATE")).isEqualTo(2);
+        assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_END_WORK_DATE")).isEqualTo(2);
+        assertThat(query.indexOf("work date cannot be combined with range"))
+            .isLessThan(query.indexOf("db_query_vouchers("));
+        assertThat(db).contains(
+            "(:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD'))",
+            "(:end_work_date IS NULL OR WORK_DATE<TO_DATE(:end_work_date, 'YYYY-MM-DD')+1)"
+        );
+        assertThat(countOccurrences(db, "bind_text(stmt, \":start_work_date\", start_work_date)")).isEqualTo(2);
+        assertThat(countOccurrences(db, "bind_text(stmt, \":end_work_date\", end_work_date)")).isEqualTo(2);
+    }
+
+    @Test
     void nativeBankKeywordMatchesNumberAndReviewReturnKeepsComment() throws Exception {
         String bank = Files.readString(root.resolve("tuxedo-server/src/services/bank_query.c"));
         String review = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_review.c"));

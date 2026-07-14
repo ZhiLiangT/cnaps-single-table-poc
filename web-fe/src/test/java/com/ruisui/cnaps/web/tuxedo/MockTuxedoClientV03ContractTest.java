@@ -72,7 +72,7 @@ class MockTuxedoClientV03ContractTest {
         assertThat(created.respCode()).isEqualTo("0000");
         assertThat(created.fields())
             .doesNotContainKeys("CHECKER_NO", "DELETE_TIME", "CLIENT_ONLY_FIELD")
-            .containsEntry("STATUS", "00_DRAFT")
+            .containsEntry("STATUS", "10_PENDING_REVIEW")
             .containsEntry("VERSION_NO", 1)
             .containsEntry("LAST_ACTION", "CREATE")
             .containsEntry("OPERATOR_NO", "77210021")
@@ -286,7 +286,7 @@ class MockTuxedoClientV03ContractTest {
             .containsEntry("OPERATOR_NO", "77210021")
             .containsEntry("BRANCH_NO", "772")
             .containsEntry("CREATED_AT", created.fields().get("CREATED_AT"))
-            .containsEntry("STATUS", "00_DRAFT")
+            .containsEntry("STATUS", "10_PENDING_REVIEW")
             .containsEntry("LAST_ACTION", "UPDATE")
             .containsEntry("VERSION_NO", 2)
             .containsEntry("PAYEE_NAME", "修改后户名");

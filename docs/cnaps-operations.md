@@ -24,6 +24,8 @@ WebFE/Tomcat -> Jolt -> Tuxedo C 服务 -> OCI -> Oracle XE
 
 日常启动、重启和重新部署都不会运行 `scripts/init-db.sh`。数据库初始化脚本只允许在全新数据库首次建表时手工执行，不能放入开机自启或日常部署流程。
 
+旧凭证状态迁移同样只能在维护窗口手工执行。发布不再生成 `00_DRAFT` 的应用前，必须先停止 Tomcat 和 Tuxedo，再执行幂等脚本 `scripts/migrate-voucher-review.sh`，避免新旧状态规则同时写库。
+
 sudo 密码只在终端需要时交互输入，不写入脚本或提示词。
 
 ### 2.1 Oracle OCI 中文字符集
@@ -60,6 +62,7 @@ cd /home/tian/cnaps-single-table-poc
 | 查看状态 | `./scripts/cnapsctl.sh status` | 显示服务、端口、Tuxedo 和健康接口状态 |
 | 健康检查 | `./scripts/cnapsctl.sh health` | 三个组件全部为 `UP` 才返回成功 |
 | 查看日志 | `./scripts/cnapsctl.sh logs` | 输出最近的 Tuxedo ULOG 和 Tomcat journal |
+| 迁移旧凭证状态 | `sh ./scripts/migrate-voucher-review.sh` | 维护窗口内将历史 `00_DRAFT` 幂等迁移为 `10_PENDING_REVIEW` |
 | 安装开机自启 | `./scripts/cnapsctl.sh install-autostart` | 安装并启用 systemd 配置 |
 
 查看全部命令：
@@ -104,6 +107,17 @@ systemctl status tomcat --no-pager
 ```
 
 ## 5. 代码变更后的完整部署
+
+若本次发布首次淘汰 `00_DRAFT`，先在维护窗口执行：
+
+```bash
+./scripts/down.sh
+sh ./scripts/migrate-voucher-review.sh
+./scripts/rebuild-deploy.sh
+./scripts/cnapsctl.sh status
+```
+
+迁移失败时不得启动新应用。迁移脚本可重复执行，不会再次修改已经迁移为 `10_PENDING_REVIEW` 的记录；不得用 `scripts/init-db.sh` 代替升级迁移。
 
 代码已同步到虚拟机后执行：
 

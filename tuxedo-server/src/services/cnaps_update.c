@@ -134,7 +134,7 @@ void CNAPS5701U(TPSVCINFO *rqst)
         cnaps_return_error(rqst, "4001", "database error");
         return;
     }
-    if (strcmp(row.status, CNAPS_STATUS_DRAFT) != 0) {
+    if (!cnaps_status_can_edit(row.status)) {
         cnaps_return_error(rqst, "3003", "当前状态不允许操作");
         return;
     }
@@ -198,7 +198,11 @@ void CNAPS5701U(TPSVCINFO *rqst)
 
     get_field(fbfr, CNAPS_F_OPERATOR_NO, operator_no, sizeof(operator_no));
     get_field(fbfr, CNAPS_F_REQ_ID, request_id, sizeof(request_id));
-    snprintf(row.status, sizeof(row.status), "%s", CNAPS_STATUS_DRAFT);
+    snprintf(row.status, sizeof(row.status), "%s", CNAPS_STATUS_PENDING_REVIEW);
+    row.checker_no[0] = '\0';
+    row.checker_time[0] = '\0';
+    row.review_comment[0] = '\0';
+    row.reject_reason[0] = '\0';
     snprintf(row.last_action, sizeof(row.last_action), "%s", "UPDATE");
     snprintf(row.last_operator_no, sizeof(row.last_operator_no), "%s", operator_no);
     snprintf(row.last_request_id, sizeof(row.last_request_id), "%s", request_id);

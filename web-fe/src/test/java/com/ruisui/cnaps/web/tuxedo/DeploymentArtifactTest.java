@@ -266,6 +266,29 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void deploymentProvidesRepeatableLegacyDraftMigration() throws Exception {
+        String migration = Files.readString(root.resolve("sql/050_enable_voucher_review.sql"));
+        String runner = Files.readString(root.resolve("scripts/migrate-voucher-review.sh"));
+        String initDb = Files.readString(root.resolve("scripts/init-db.sh"));
+
+        assertThat(migration)
+            .contains(
+                "WHERE STATUS = '00_DRAFT'", "SET STATUS = '10_PENDING_REVIEW'",
+                "CHECKER_NO = NULL", "CHECKER_TIME = NULL", "REVIEW_COMMENT = NULL",
+                "REJECT_REASON = NULL", "VERSION_NO = NVL(VERSION_NO, 1) + 1",
+                "WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK", "IF V_AFTER <> 0", "COMMIT;"
+            );
+        assertThat(countOccurrences(migration, "UPDATE T_CNAPS_BILL_POC")).isEqualTo(1);
+        assertThat(runner)
+            .contains(
+                "conf/env.linux.sh", "conf/db.env", "sqlplus -L",
+                "WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK", "050_enable_voucher_review.sql"
+            )
+            .doesNotContain("090_drop_all.sql", "init-db.sh");
+        assertThat(initDb).contains("050_enable_voucher_review.sql");
+    }
+
+    @Test
     void tuxedo22cLocalJoltConfigurationAllowsNonTlsLoopbackForPoc() throws Exception {
         String tuxedoEnv = Files.readString(root.resolve("conf/tuxedo.env"));
         String tomcatConfig = Files.readString(root.resolve("scripts/configure-tomcat.sh"));

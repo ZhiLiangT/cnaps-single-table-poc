@@ -72,18 +72,32 @@ class TuxedoCSourceContractTest {
     }
 
     @Test
-    void nativeLifecycleAllowsOnlyDraftMutation() throws Exception {
+    void nativeLifecycleUsesReviewStatusesWithoutLegacyDraft() throws Exception {
+        String create = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_create.c"));
         String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
         String delete = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_delete.c"));
         String validation = Files.readString(root.resolve("tuxedo-server/src/common/validation_helper.c"));
         String status = Files.readString(root.resolve("tuxedo-server/include/cnaps_status.h"));
 
-        assertThat(update).contains("CNAPS_STATUS_DRAFT", "3003");
-        assertThat(delete).contains("CNAPS_STATUS_DRAFT", "3003");
+        assertThat(create).contains("CNAPS_STATUS_PENDING_REVIEW").doesNotContain("CNAPS_STATUS_DRAFT");
+        assertThat(update).contains(
+                "cnaps_status_can_edit", "CNAPS_STATUS_PENDING_REVIEW", "3003",
+                "row.checker_no[0] = '\\0'", "row.checker_time[0] = '\\0'",
+                "row.review_comment[0] = '\\0'", "row.reject_reason[0] = '\\0'"
+            )
+            .doesNotContain("CNAPS_STATUS_DRAFT");
+        assertThat(delete).contains("cnaps_status_can_edit", "3003").doesNotContain("CNAPS_STATUS_DRAFT");
         assertThat(validation)
-            .contains("strcmp(status, CNAPS_STATUS_DRAFT) == 0")
-            .doesNotContain("CNAPS_STATUS_PENDING_REVIEW", "CNAPS_STATUS_REJECTED", "cnaps_status_can_review");
-        assertThat(status).doesNotContain("cnaps_status_can_review");
+            .contains("strcmp(status, CNAPS_STATUS_PENDING_REVIEW) == 0")
+            .contains("strcmp(status, CNAPS_STATUS_REJECTED) == 0")
+            .contains("cnaps_status_can_review")
+            .doesNotContain("CNAPS_STATUS_DRAFT");
+        assertThat(status)
+            .contains(
+                "CNAPS_STATUS_PENDING_REVIEW", "CNAPS_STATUS_APPROVED",
+                "CNAPS_STATUS_REJECTED", "CNAPS_STATUS_DELETED", "cnaps_status_can_review"
+            )
+            .doesNotContain("CNAPS_STATUS_DRAFT", "00_DRAFT");
         assertThat(root.resolve("tuxedo-server/src/services/cnaps_review.c")).doesNotExist();
     }
 

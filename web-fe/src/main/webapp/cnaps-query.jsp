@@ -16,7 +16,7 @@
     <section class="workbench">
         <h1>凭证查询</h1>
         <form data-query-form>
-            <label>状态 <input name="status" value="00_DRAFT"></label>
+            <label>状态 <input name="status" value="10_PENDING_REVIEW"></label>
             <label>流水号 <input name="serialNo"></label>
             <button type="submit">查询</button>
         </form>

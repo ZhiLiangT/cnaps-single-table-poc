@@ -18,5 +18,6 @@ SQL
 
 run_sql_file "$APP_HOME/sql/010_create_tables.sql"
 run_sql_file "$APP_HOME/sql/040_add_party_address_bank_fields.sql"
+run_sql_file "$APP_HOME/sql/050_enable_voucher_review.sql"
 run_sql_file "$APP_HOME/sql/020_create_indexes.sql"
 run_sql_file "$APP_HOME/sql/030_seed_reference_data.sql"

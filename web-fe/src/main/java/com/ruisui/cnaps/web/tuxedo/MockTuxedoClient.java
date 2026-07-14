@@ -139,7 +139,7 @@ public class MockTuxedoClient implements TuxedoClient {
         voucher.put("BRANCH_NO", branchNo);
         voucher.put("BILL_ID", billId);
         voucher.put("SERIAL_NO", serialNo);
-        voucher.put("STATUS", "00_DRAFT");
+        voucher.put("STATUS", "10_PENDING_REVIEW");
         voucher.put("LAST_ACTION", "CREATE");
         voucher.put("VERSION_NO", 1);
         voucher.put("DEBIT_MODE", text(request, "DEBIT_MODE", "1"));
@@ -152,7 +152,7 @@ public class MockTuxedoClient implements TuxedoClient {
         voucher.put("CREATED_AT", now);
         voucher.put("UPDATED_AT", now);
         vouchers.put(billId, voucher);
-        return ok("录入成功", voucher);
+        return ok("录入成功，待审核", voucher);
     }
 
     private TuxedoResponse update(TuxedoRequest request) {
@@ -177,7 +177,11 @@ public class MockTuxedoClient implements TuxedoClient {
                 voucher.put(field, request.fields().get(field));
             }
         }
-        voucher.put("STATUS", "00_DRAFT");
+        voucher.put("STATUS", "10_PENDING_REVIEW");
+        voucher.remove("CHECKER_NO");
+        voucher.remove("CHECKER_TIME");
+        voucher.remove("REVIEW_COMMENT");
+        voucher.remove("REJECT_REASON");
         voucher.put("LAST_ACTION", "UPDATE");
         voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
         touch(voucher, request);
@@ -284,7 +288,8 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private boolean editable(Map<String, Object> voucher) {
-        return "00_DRAFT".equals(voucher.get("STATUS"));
+        return "10_PENDING_REVIEW".equals(voucher.get("STATUS"))
+            || "30_REVIEW_REJECTED".equals(voucher.get("STATUS"));
     }
 
     private TuxedoResponse validateCreate(TuxedoRequest request) {

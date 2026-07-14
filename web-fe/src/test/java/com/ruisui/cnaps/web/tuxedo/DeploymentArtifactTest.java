@@ -301,7 +301,7 @@ class DeploymentArtifactTest {
                 "创建时必填",
                 "修改时可选",
                 "均未传时不按工作日期筛选",
-                "修改 `workDate` 不会重新生成 `billId` 或 `serialNo`，两者保持不变。")
+                "修改 `workDate` 不会重新生成 `billId` 或 `serialNo`")
             .doesNotContain(
                 "### 1.4 公共请求头",
                 "-H \"requestId:",
@@ -314,25 +314,25 @@ class DeploymentArtifactTest {
     void frontendApiDocumentsRangeOnlyVoucherListDates() throws Exception {
         String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
         String generalList = api.substring(
-            api.indexOf("## 6.7 通用查询"),
-            api.indexOf("## 6.8 待复核查询")
+            api.indexOf("### 4.7 通用查询"),
+            api.indexOf("### 4.8 待复核查询")
         );
-        int reviewStart = api.indexOf("## 6.8 待复核查询");
-        String reviewList = api.substring(reviewStart, api.indexOf("## 6.9", reviewStart));
+        int reviewStart = api.indexOf("### 4.8 待复核查询");
+        String reviewList = api.substring(reviewStart, api.indexOf("### 4.9", reviewStart));
 
         for (String section : List.of(generalList, reviewList)) {
             assertThat(section)
                 .contains(
                     "`startWorkDate`",
                     "`endWorkDate`",
-                    "列表查询不支持 workDate，请使用 startWorkDate/endWorkDate"
+                    "Body 中不得出现"
                 )
                 .doesNotContain("| `workDate` | string | 否");
         }
     }
 
     @Test
-    void frontendApiDocumentsTheApprovedHeaderlessV03Contract() throws Exception {
+    void frontendApiDocumentsTheApprovedHeaderlessContract() throws Exception {
         String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
 
         assertThat(api).contains(
@@ -343,7 +343,8 @@ class DeploymentArtifactTest {
             "修改时可选",
             "`pageNo`",
             "`pageSize`",
-            "不校验复核人与录入人是否相同"
+            "不校验复核人与录入人是否相同",
+            "Content-Type: application/json; charset=UTF-8"
         ).doesNotContain(
             "| `success`",
             "| `page` |",
@@ -357,23 +358,22 @@ class DeploymentArtifactTest {
         );
 
         assertThat(api).contains(
-            "| `GET /api/health` | `SYSHEALTH` |",
-            "| `GET /api/dicts/{dictType}` | `DICTQRY` |",
-            "| `GET /api/banks` | `BANKQRY` |",
-            "| `POST /api/cnaps/vouchers` | `CNAPS5701E` |",
-            "| `PUT /api/cnaps/vouchers/{billId}` | `CNAPS5701U` |",
-            "| `POST /api/cnaps/vouchers/{billId}/delete` | `CNAPS5701D` |",
-            "| `POST /api/cnaps/vouchers/query` | `CNAPS4609Q` |",
-            "| `POST /api/cnaps/vouchers/review-list` | `CNAPS5702Q` |",
-            "| `GET /api/cnaps/vouchers/{billId}` | `CNAPS5702I` |",
-            "| `POST /api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` |",
-            "| `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` |"
+            "| `GET /api/health` | 健康检查 |",
+            "| `GET /api/dicts/{dictType}` | 字典查询 |",
+            "| `GET /api/banks` | 行号查询 |",
+            "| `POST /api/cnaps/vouchers` | 单据录入 |",
+            "| `PUT /api/cnaps/vouchers/{billId}` | 单据修改 |",
+            "| `POST /api/cnaps/vouchers/{billId}/delete` | 逻辑删除 |",
+            "| `POST /api/cnaps/vouchers/query` | 通用查询 |",
+            "| `POST /api/cnaps/vouchers/review-list` | 待复核查询 |",
+            "| `GET /api/cnaps/vouchers/{billId}` | 单据详情 |",
+            "| `POST /api/cnaps/vouchers/{billId}/review-pass` | 复核通过 |",
+            "| `POST /api/cnaps/vouchers/{billId}/review-return` | 复核退回 |"
         );
 
-        assertThat(Pattern.compile("(?m)^## 6\\.\\d+ ").matcher(api).results()).hasSize(11);
-        assertThat(countOccurrences(api, "-H \"Content-Type: application/json; charset=UTF-8\"")).isEqualTo(7);
+        assertThat(Pattern.compile("(?m)^### 4\\.\\d+ ").matcher(api).results()).hasSize(11);
 
-        String errorCodeTable = api.substring(api.indexOf("## 8. 错误码"), api.indexOf("错误响应示例："));
+        String errorCodeTable = api.substring(api.indexOf("## 6. 错误码"), api.indexOf("## 7. POC 限制"));
         List<String> activeErrorCodes = Pattern.compile("(?m)^\\| `(\\d{4})` \\|")
             .matcher(errorCodeTable)
             .results()
@@ -402,30 +402,28 @@ class DeploymentArtifactTest {
     }
 
     @Test
-    void frontendApiUsesTheDetailedOriginalFormatForAllCurrentEndpoints() throws Exception {
+    void frontendApiKeepsAConciseContractForAllCurrentEndpoints() throws Exception {
         String api = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
 
         assertThat(api).contains(
-            "# 银行 Tuxedo 后端模拟系统 API 文档",
-            "文档版本：v0.5 单表 POC 版",
-            "编写日期：2026-07-13",
-            "## 1. 文档说明",
-            "## 2. 基础约定",
-            "## 3. 通用响应格式",
-            "## 4. 接口清单",
-            "## 5. 状态模型",
-            "## 6. API 详情",
-            "## 7. 单据完整字段说明",
-            "## 8. 错误码",
-            "## 9. 典型联调流程",
-            "## 10. POC 边界",
-            "### 基本信息",
-            "### 请求示例",
-            "### 成功响应示例",
-            "### 响应字段说明"
+            "# CNAPS 单表 POC 前端 API",
+            "版本：v0.5",
+            "## 1. 通用约定",
+            "## 2. 接口清单",
+            "## 3. 单据状态",
+            "## 4. API",
+            "## 5. 单据字段",
+            "## 6. 错误码",
+            "## 7. POC 限制"
         );
 
-        assertThat(api).contains("v0.5 变更", "列表查询改为 POST JSON Body");
+        assertThat(api).doesNotContain(
+            "核心调用链路",
+            "典型联调流程",
+            "Tuxedo 服务",
+            "是否写库",
+            "### 请求示例"
+        );
 
         for (String endpoint : List.of(
             "GET /api/health",

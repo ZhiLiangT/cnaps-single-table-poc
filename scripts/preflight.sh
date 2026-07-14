@@ -41,6 +41,8 @@ require_cmd tmloadcf
 require_cmd buildserver
 
 require_path "$ORACLE_HOME"
+require_path "$ORACLE_HOME/lib"
+require_path "$ORACLE_BUILD_HOME/sdk/include"
 require_path "$TUXDIR"
 require_path "$APP_HOME/tuxedo/UBBCONFIG"
 require_path "$APP_HOME/tuxedo/jolt/cnaps_services.bulk"

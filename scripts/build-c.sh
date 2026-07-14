@@ -9,4 +9,4 @@ APP_HOME=${APP_HOME:-$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)}
 . "$APP_HOME/conf/db.env"
 
 echo "Building Tuxedo C services under $APP_HOME"
-make -C "$APP_HOME/tuxedo-server" clean all
+make -C "$APP_HOME/tuxedo-server" clean all ORACLE_HOME="$ORACLE_BUILD_HOME"

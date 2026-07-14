@@ -203,7 +203,7 @@ Body 参数：
 | `pageNo` | number | 页码，默认 `1` |
 | `pageSize` | number | 每页条数，默认 `10` |
 
-不设置筛选条件时传 `{}`。日期范围可只传一端；开始日期不能晚于结束日期。Body 中不得出现旧字段 `workDate`，否则返回 HTTP 400 / `2002`。
+不设置筛选条件时传 `{}`。日期范围可只传一端；开始日期不能晚于结束日期。
 
 ### 4.8 待复核查询
 
@@ -221,7 +221,7 @@ Body 参数：
 | `pageNo` | number | 页码，默认 `1` |
 | `pageSize` | number | 每页条数，默认 `10` |
 
-查询规则与通用查询一致，只返回 `10_PENDING_REVIEW` 状态的记录。不设置筛选条件时传 `{}`，Body 中不得出现 `workDate`。
+查询规则与通用查询一致，只返回 `10_PENDING_REVIEW` 状态的记录。不设置筛选条件时传 `{}`。
 
 两个列表接口的 `records` 元素均包含：
 
@@ -237,8 +237,6 @@ Body 参数：
 | `status` | string |
 | `versionNo` | number |
 
-待复核列表可能不返回 `voucherNo`。列表不返回 `payerAddress`、`payeeAddress`、`payerBankName`，需要时调用详情接口。
-
 ### 4.9 单据详情
 
 ```http
@@ -253,11 +251,7 @@ GET /api/cnaps/vouchers/{billId}
 POST /api/cnaps/vouchers/{billId}/review-pass
 ```
 
-可选 Body：
-
-```json
-{ "reviewComment": "复核通过" }
-```
+无需传入 Body。
 
 仅 `10_PENDING_REVIEW` 状态可操作，成功后状态为 `20_REVIEW_APPROVED`。
 
@@ -267,16 +261,9 @@ POST /api/cnaps/vouchers/{billId}/review-pass
 POST /api/cnaps/vouchers/{billId}/review-return
 ```
 
-Body：
+无需传入 Body。
 
-```json
-{
-  "rejectReason": "收款人户名不完整",
-  "reviewComment": "请修改后重新提交"
-}
-```
-
-`rejectReason` 必填，`reviewComment` 可选。仅 `10_PENDING_REVIEW` 状态可操作，成功后状态为 `30_REVIEW_REJECTED`。
+仅 `10_PENDING_REVIEW` 状态可操作，成功后状态为 `30_REVIEW_REJECTED`。
 
 ## 5. 单据字段
 

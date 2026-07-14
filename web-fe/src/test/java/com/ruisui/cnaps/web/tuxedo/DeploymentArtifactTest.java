@@ -221,6 +221,20 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void oracleRuntimeAndBuildHomesRemainSeparated() throws Exception {
+        String environment = Files.readString(root.resolve("conf/env.linux.sh"));
+        String buildScript = Files.readString(root.resolve("scripts/build-c.sh"));
+
+        assertThat(environment).contains(
+            "ORACLE_HOME=${ORACLE_HOME:-/opt/oracle/product/21c/dbhomeXE}",
+            "ORACLE_BUILD_HOME=${ORACLE_BUILD_HOME:-/opt/oracle/instantclient}",
+            "ORACLE_SERVICE=${ORACLE_SERVICE:-XEPDB1}",
+            "ORA_NLS10=${ORA_NLS10:-$ORACLE_HOME/nls/data}"
+        );
+        assertThat(buildScript).contains("ORACLE_HOME=\"$ORACLE_BUILD_HOME\"");
+    }
+
+    @Test
     void joltMetadataLoadRemovesRetiredReviewServices() throws Exception {
         assertThat(Files.readString(root.resolve("scripts/load-jolt-metadata.sh")))
             .contains("tmloadrepos -d CNAPS5702Q,CNAPS5702A,CNAPS5702R -y");
@@ -317,8 +331,7 @@ class DeploymentArtifactTest {
             assertThat(section)
                 .contains(
                     "`startWorkDate`",
-                    "`endWorkDate`",
-                    "Body 中不得出现"
+                    "`endWorkDate`"
                 )
                 .doesNotContain("| `workDate` | string | 否");
         }

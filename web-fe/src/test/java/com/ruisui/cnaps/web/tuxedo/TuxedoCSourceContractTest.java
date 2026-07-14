@@ -75,9 +75,15 @@ class TuxedoCSourceContractTest {
     void nativeLifecycleAllowsOnlyDraftMutation() throws Exception {
         String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
         String delete = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_delete.c"));
+        String validation = Files.readString(root.resolve("tuxedo-server/src/common/validation_helper.c"));
+        String status = Files.readString(root.resolve("tuxedo-server/include/cnaps_status.h"));
 
         assertThat(update).contains("CNAPS_STATUS_DRAFT", "3003");
         assertThat(delete).contains("CNAPS_STATUS_DRAFT", "3003");
+        assertThat(validation)
+            .contains("strcmp(status, CNAPS_STATUS_DRAFT) == 0")
+            .doesNotContain("CNAPS_STATUS_PENDING_REVIEW", "CNAPS_STATUS_REJECTED", "cnaps_status_can_review");
+        assertThat(status).doesNotContain("cnaps_status_can_review");
         assertThat(root.resolve("tuxedo-server/src/services/cnaps_review.c")).doesNotExist();
     }
 

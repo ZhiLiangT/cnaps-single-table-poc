@@ -221,6 +221,12 @@ class DeploymentArtifactTest {
     }
 
     @Test
+    void joltMetadataLoadRemovesRetiredReviewServices() throws Exception {
+        assertThat(Files.readString(root.resolve("scripts/load-jolt-metadata.sh")))
+            .contains("tmloadrepos -d CNAPS5702Q,CNAPS5702A,CNAPS5702R -y");
+    }
+
+    @Test
     void schemaAndInitScriptProvideRepeatablePartyAddressMigration() throws Exception {
         String createTable = Files.readString(root.resolve("sql/010_create_tables.sql"));
         String schema = Files.readString(root.resolve("sql/schema.sql"));

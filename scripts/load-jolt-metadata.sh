@@ -124,6 +124,7 @@ awk '
 
 mkdir -p "$(dirname "$METAREPOS_FILE")"
 tmunloadrepos "$JOLT_REPOSITORY" > "$METADATA_INPUT"
+tmloadrepos -d CNAPS5702Q,CNAPS5702A,CNAPS5702R -y "$METAREPOS_FILE"
 tmloadrepos -y -i "$METADATA_INPUT" "$METAREPOS_FILE"
 
 echo "Loaded Jolt metadata repository $METAREPOS_FILE from $METADATA_FILE"

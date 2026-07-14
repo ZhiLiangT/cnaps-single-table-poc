@@ -97,7 +97,7 @@ class MockTuxedoClientWorkDateTest {
         createVoucher("2026-07-11", "SERVER-BRANCH");
         createVoucher("2026-07-10", "OTHER-BRANCH");
 
-        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+        for (String service : List.of("CNAPS4609Q")) {
             assertThat(records(client.call(
                 service,
                 request(Map.of("WORK_DATE", "2026-07-10", "BRANCH_NO", "SERVER-BRANCH"))
@@ -114,7 +114,7 @@ class MockTuxedoClientWorkDateTest {
         createVoucher("2026-07-12", "SERVER-BRANCH");
         createVoucher("2026-07-13", "SERVER-BRANCH");
 
-        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+        for (String service : List.of("CNAPS4609Q")) {
             List<Map<String, Object>> records = records(client.call(
                 service,
                 request(Map.of(
@@ -136,7 +136,7 @@ class MockTuxedoClientWorkDateTest {
         createVoucher("2026-07-12", "SERVER-BRANCH");
         createVoucher("2026-07-13", "SERVER-BRANCH");
 
-        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+        for (String service : List.of("CNAPS4609Q")) {
             assertThat(records(client.call(
                 service,
                 request(Map.of("START_WORK_DATE", "2026-07-10"))
@@ -160,7 +160,7 @@ class MockTuxedoClientWorkDateTest {
         createVoucher("2026-07-09", "SERVER-BRANCH");
         createVoucher("2026-07-13", "SERVER-BRANCH");
 
-        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+        for (String service : List.of("CNAPS4609Q")) {
             TuxedoResponse response = client.call(
                 service,
                 request(Map.of("START_WORK_DATE", " ", "END_WORK_DATE", ""))
@@ -181,7 +181,7 @@ class MockTuxedoClientWorkDateTest {
             Map.of("START_WORK_DATE", "2026-07-12", "END_WORK_DATE", "2026-07-10")
         );
 
-        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+        for (String service : List.of("CNAPS4609Q")) {
             for (Map<String, ?> filter : invalidFilters) {
                 assertThat(client.call(service, request(filter)).respCode())
                     .as(service + " " + filter)

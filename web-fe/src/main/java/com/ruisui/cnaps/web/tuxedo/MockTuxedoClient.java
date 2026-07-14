@@ -92,7 +92,7 @@ public class MockTuxedoClient implements TuxedoClient {
 
     @Override
     public TuxedoResponse call(String serviceName, TuxedoRequest request) {
-        if ("CNAPS4609Q".equals(serviceName) || "CNAPS5702Q".equals(serviceName)) {
+        if ("CNAPS4609Q".equals(serviceName)) {
             TuxedoResponse validation = validateWorkDateFilter(request);
             if (validation != null) {
                 return validation;
@@ -104,12 +104,9 @@ public class MockTuxedoClient implements TuxedoClient {
             case "BANKQRY" -> ok("查询成功", data(bankPage(request)));
             case "CNAPS5701E" -> create(request);
             case "CNAPS4609Q" -> ok("查询成功", data(voucherPage(request, null)));
-            case "CNAPS5702Q" -> ok("查询成功", data(voucherPage(request, "10_PENDING_REVIEW")));
             case "CNAPS5702I" -> detail(request);
             case "CNAPS5701U" -> update(request);
             case "CNAPS5701D" -> delete(request);
-            case "CNAPS5702A" -> reviewPass(request);
-            case "CNAPS5702R" -> reviewReturn(request);
             default -> TuxedoResponse.fail("4003", "Tuxedo服务不可用：" + serviceName);
         };
     }
@@ -142,7 +139,7 @@ public class MockTuxedoClient implements TuxedoClient {
         voucher.put("BRANCH_NO", branchNo);
         voucher.put("BILL_ID", billId);
         voucher.put("SERIAL_NO", serialNo);
-        voucher.put("STATUS", "10_PENDING_REVIEW");
+        voucher.put("STATUS", "00_DRAFT");
         voucher.put("LAST_ACTION", "CREATE");
         voucher.put("VERSION_NO", 1);
         voucher.put("DEBIT_MODE", text(request, "DEBIT_MODE", "1"));
@@ -155,7 +152,7 @@ public class MockTuxedoClient implements TuxedoClient {
         voucher.put("CREATED_AT", now);
         voucher.put("UPDATED_AT", now);
         vouchers.put(billId, voucher);
-        return ok("录入成功，待复核", voucher);
+        return ok("录入成功", voucher);
     }
 
     private TuxedoResponse update(TuxedoRequest request) {
@@ -180,15 +177,11 @@ public class MockTuxedoClient implements TuxedoClient {
                 voucher.put(field, request.fields().get(field));
             }
         }
-        voucher.put("STATUS", "10_PENDING_REVIEW");
+        voucher.put("STATUS", "00_DRAFT");
         voucher.put("LAST_ACTION", "UPDATE");
         voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
-        voucher.remove("REJECT_REASON");
-        voucher.remove("CHECKER_NO");
-        voucher.remove("CHECKER_TIME");
-        voucher.remove("REVIEW_COMMENT");
         touch(voucher, request);
-        return ok("修改成功，待复核", voucher);
+        return ok("修改成功", voucher);
     }
 
     private TuxedoResponse delete(TuxedoRequest request) {
@@ -207,48 +200,6 @@ public class MockTuxedoClient implements TuxedoClient {
         voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
         touch(voucher, request);
         return ok("删除成功", voucher);
-    }
-
-    private TuxedoResponse reviewPass(TuxedoRequest request) {
-        Map<String, Object> voucher = load(request);
-        if (voucher == null) {
-            return TuxedoResponse.fail("3001", "单据不存在");
-        }
-        if (!"10_PENDING_REVIEW".equals(voucher.get("STATUS"))) {
-            return TuxedoResponse.fail("3004", "单据状态已变化");
-        }
-        voucher.put("STATUS", "20_REVIEW_APPROVED");
-        voucher.put("LAST_ACTION", "REVIEW_PASS");
-        setOptional(voucher, "CHECKER_NO", text(request, "OPERATOR_NO"));
-        voucher.put("CHECKER_TIME", now());
-        setOptional(voucher, "REVIEW_COMMENT", text(request, "REVIEW_COMMENT"));
-        voucher.remove("REJECT_REASON");
-        voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
-        touch(voucher, request);
-        return ok("操作已成功", voucher);
-    }
-
-    private TuxedoResponse reviewReturn(TuxedoRequest request) {
-        Map<String, Object> voucher = load(request);
-        if (voucher == null) {
-            return TuxedoResponse.fail("3001", "单据不存在");
-        }
-        String rejectReason = text(request, "REJECT_REASON");
-        if (rejectReason == null || rejectReason.isBlank()) {
-            return TuxedoResponse.fail("2001", "必输字段为空：rejectReason");
-        }
-        if (!"10_PENDING_REVIEW".equals(voucher.get("STATUS"))) {
-            return TuxedoResponse.fail("3004", "单据状态已变化");
-        }
-        voucher.put("STATUS", "30_REVIEW_REJECTED");
-        voucher.put("LAST_ACTION", "REVIEW_RETURN");
-        setOptional(voucher, "CHECKER_NO", text(request, "OPERATOR_NO"));
-        voucher.put("CHECKER_TIME", now());
-        voucher.put("REJECT_REASON", rejectReason);
-        setOptional(voucher, "REVIEW_COMMENT", text(request, "REVIEW_COMMENT"));
-        voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
-        touch(voucher, request);
-        return ok("复核退回成功", voucher);
     }
 
     private TuxedoResponse detail(TuxedoRequest request) {
@@ -333,7 +284,7 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private boolean editable(Map<String, Object> voucher) {
-        return "10_PENDING_REVIEW".equals(voucher.get("STATUS")) || "30_REVIEW_REJECTED".equals(voucher.get("STATUS"));
+        return "00_DRAFT".equals(voucher.get("STATUS"));
     }
 
     private TuxedoResponse validateCreate(TuxedoRequest request) {

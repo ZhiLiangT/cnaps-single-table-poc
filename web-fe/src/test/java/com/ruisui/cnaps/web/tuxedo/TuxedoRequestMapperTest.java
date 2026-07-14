@@ -18,22 +18,31 @@ class TuxedoRequestMapperTest {
         assertThat(mapper.serviceName("GET", "/api/banks")).isEqualTo("BANKQRY");
         assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers")).isEqualTo("CNAPS5701E");
         assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/query")).isEqualTo("CNAPS4609Q");
-        assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/review-list")).isEqualTo("CNAPS5702Q");
         assertThat(mapper.serviceName("GET", "/api/cnaps/vouchers/B202607087720002000")).isEqualTo("CNAPS5702I");
         assertThat(mapper.serviceName("PUT", "/api/cnaps/vouchers/B202607087720002000")).isEqualTo("CNAPS5701U");
         assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/B202607087720002000/delete")).isEqualTo("CNAPS5701D");
-        assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/B202607087720002000/review-pass")).isEqualTo("CNAPS5702A");
-        assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/B202607087720002000/review-return")).isEqualTo("CNAPS5702R");
     }
 
     @Test
     void rejectsRetiredVoucherListGetMappings() {
         for (String path : List.of(
             "/api/cnaps/vouchers",
-            "/api/cnaps/vouchers/query",
-            "/api/cnaps/vouchers/review-list"
+            "/api/cnaps/vouchers/query"
         )) {
             assertThatThrownBy(() -> mapper.serviceName("GET", path))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unsupported WebFE operation");
+        }
+    }
+
+    @Test
+    void rejectsRemovedReviewMappings() {
+        for (String path : List.of(
+            "/api/cnaps/vouchers/review-list",
+            "/api/cnaps/vouchers/B202607087720002000/review-pass",
+            "/api/cnaps/vouchers/B202607087720002000/review-return"
+        )) {
+            assertThatThrownBy(() -> mapper.serviceName("POST", path))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unsupported WebFE operation");
         }

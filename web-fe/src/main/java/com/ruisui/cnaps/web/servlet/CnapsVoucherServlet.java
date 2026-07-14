@@ -16,7 +16,7 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String apiPath = RequestSupport.apiPath(request);
-        if (isRejectedGetPath(apiPath)) {
+        if (isRejectedGetPath(apiPath) || isRemovedReviewPath(apiPath)) {
             response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
             return;
         }
@@ -29,6 +29,10 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, Object> fields = JsonSupport.readBodyMap(request);
         String apiPath = RequestSupport.apiPath(request);
+        if (isRemovedReviewPath(apiPath)) {
+            response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+            return;
+        }
         boolean listPost = isListPostPath(apiPath);
         if (listPost && !validateListFilters(fields, response)) {
             return;
@@ -47,14 +51,18 @@ public class CnapsVoucherServlet extends BaseJsonServlet {
     }
 
     private static boolean isListPostPath(String apiPath) {
-        return "/api/cnaps/vouchers/query".equals(apiPath)
-            || "/api/cnaps/vouchers/review-list".equals(apiPath);
+        return "/api/cnaps/vouchers/query".equals(apiPath);
     }
 
     private static boolean isRejectedGetPath(String apiPath) {
         return "/api/cnaps/vouchers".equals(apiPath)
-            || "/api/cnaps/vouchers/query".equals(apiPath)
-            || "/api/cnaps/vouchers/review-list".equals(apiPath);
+            || "/api/cnaps/vouchers/query".equals(apiPath);
+    }
+
+    private static boolean isRemovedReviewPath(String apiPath) {
+        return "/api/cnaps/vouchers/review-list".equals(apiPath)
+            || apiPath.endsWith("/review-pass")
+            || apiPath.endsWith("/review-return");
     }
 
     private boolean validateListFilters(Map<String, Object> fields, HttpServletResponse response) throws IOException {

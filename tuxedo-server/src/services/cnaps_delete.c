@@ -38,8 +38,7 @@ void CNAPS5701D(TPSVCINFO *rqst)
         cnaps_return_error(rqst, "4001", "database error");
         return;
     }
-    if (strcmp(row.status, CNAPS_STATUS_PENDING_REVIEW) != 0
-        && strcmp(row.status, CNAPS_STATUS_REJECTED) != 0) {
+    if (strcmp(row.status, CNAPS_STATUS_DRAFT) != 0) {
         cnaps_return_error(rqst, "3003", "当前状态不允许操作");
         return;
     }

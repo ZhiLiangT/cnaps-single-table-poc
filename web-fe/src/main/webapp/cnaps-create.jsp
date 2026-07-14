@@ -12,7 +12,6 @@
     <nav class="top-nav">
         <a href="index.jsp">首页</a>
         <a href="cnaps-query.jsp">查询</a>
-        <a href="cnaps-review.jsp">复核</a>
     </nav>
     <form class="workbench" data-create-form>
         <h1>凭证录入</h1>

@@ -1,3 +1,4 @@
+
 package com.ruisui.cnaps.web.tuxedo;
 
 import org.junit.jupiter.api.Test;
@@ -71,7 +72,7 @@ class MockTuxedoClientV03ContractTest {
         assertThat(created.respCode()).isEqualTo("0000");
         assertThat(created.fields())
             .doesNotContainKeys("CHECKER_NO", "DELETE_TIME", "CLIENT_ONLY_FIELD")
-            .containsEntry("STATUS", "10_PENDING_REVIEW")
+            .containsEntry("STATUS", "00_DRAFT")
             .containsEntry("VERSION_NO", 1)
             .containsEntry("LAST_ACTION", "CREATE")
             .containsEntry("OPERATOR_NO", "77210021")
@@ -79,42 +80,6 @@ class MockTuxedoClientV03ContractTest {
         assertThat(created.fields().get("BILL_ID")).isNotEqualTo("CLIENT-BILL");
         assertThat(created.fields().get("SERIAL_NO")).isNotEqualTo("9999999");
         assertThat(created.fields().get("CREATED_AT")).isNotEqualTo("client-created-at");
-    }
-
-    @Test
-    void fixedPocOperatorCanCreateAndReviewTheSameVoucher() {
-        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
-        TuxedoResponse reviewed = client.call(
-            "CNAPS5702A",
-            request(Map.of("BILL_ID", created.fields().get("BILL_ID")))
-        );
-
-        assertThat(reviewed.respCode()).isEqualTo("0000");
-        assertThat(reviewed.fields()).containsEntry("STATUS", "20_REVIEW_APPROVED");
-    }
-
-    @Test
-    void returnUpdateAndDeleteFollowTheApprovedStateFlow() {
-        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
-        Object billId = created.fields().get("BILL_ID");
-        TuxedoResponse returned = client.call(
-            "CNAPS5702R",
-            request(Map.of("BILL_ID", billId, "REJECT_REASON", "户名有误"))
-        );
-        TuxedoResponse updated = client.call(
-            "CNAPS5701U",
-            request(Map.of("BILL_ID", billId, "PAYEE_NAME", "修改后户名"))
-        );
-        TuxedoResponse deleted = client.call(
-            "CNAPS5701D",
-            request(Map.of("BILL_ID", billId, "DELETE_REASON", "录入错误"))
-        );
-
-        assertThat(returned.fields()).containsEntry("STATUS", "30_REVIEW_REJECTED");
-        assertThat(updated.fields())
-            .containsEntry("STATUS", "10_PENDING_REVIEW")
-            .containsEntry("PAYEE_NAME", "修改后户名");
-        assertThat(deleted.fields()).containsEntry("STATUS", "40_DELETED");
     }
 
     @Test
@@ -321,45 +286,10 @@ class MockTuxedoClientV03ContractTest {
             .containsEntry("OPERATOR_NO", "77210021")
             .containsEntry("BRANCH_NO", "772")
             .containsEntry("CREATED_AT", created.fields().get("CREATED_AT"))
-            .containsEntry("STATUS", "10_PENDING_REVIEW")
+            .containsEntry("STATUS", "00_DRAFT")
             .containsEntry("LAST_ACTION", "UPDATE")
             .containsEntry("VERSION_NO", 2)
             .containsEntry("PAYEE_NAME", "修改后户名");
-    }
-
-    @Test
-    void blankReturnReasonDoesNotMutateTheVoucher() {
-        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
-        Object billId = created.fields().get("BILL_ID");
-
-        TuxedoResponse returned = client.call(
-            "CNAPS5702R",
-            request(Map.of("BILL_ID", billId, "REJECT_REASON", " "))
-        );
-        TuxedoResponse detail = client.call("CNAPS5702I", request(Map.of("BILL_ID", billId)));
-
-        assertThat(returned.respCode()).isEqualTo("2001");
-        assertThat(detail.fields())
-            .containsEntry("STATUS", "10_PENDING_REVIEW")
-            .containsEntry("VERSION_NO", 1);
-    }
-
-    @Test
-    void invalidStatesReturnTheDocumentedOperationErrors() {
-        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
-        Object billId = created.fields().get("BILL_ID");
-        client.call("CNAPS5702A", request(Map.of("BILL_ID", billId)));
-
-        assertThat(client.call("CNAPS5701U", request(Map.of("BILL_ID", billId))).respCode())
-            .isEqualTo("3003");
-        assertThat(client.call("CNAPS5701D", request(Map.of("BILL_ID", billId))).respCode())
-            .isEqualTo("3003");
-        assertThat(client.call("CNAPS5702A", request(Map.of("BILL_ID", billId))).respCode())
-            .isEqualTo("3004");
-        assertThat(client.call(
-            "CNAPS5702R",
-            request(Map.of("BILL_ID", billId, "REJECT_REASON", "退回"))
-        ).respCode()).isEqualTo("3004");
     }
 
     @Test
@@ -500,24 +430,6 @@ class MockTuxedoClientV03ContractTest {
     }
 
     @Test
-    void reviewReturnPreservesOptionalReviewComment() {
-        TuxedoResponse created = client.call("CNAPS5701E", request(Map.of()));
-
-        TuxedoResponse returned = client.call(
-            "CNAPS5702R",
-            request(Map.of(
-                "BILL_ID", created.fields().get("BILL_ID"),
-                "REJECT_REASON", "资料不完整",
-                "REVIEW_COMMENT", "请补全附件"
-            ))
-        );
-
-        assertThat(returned.fields())
-            .containsEntry("REJECT_REASON", "资料不完整")
-            .containsEntry("REVIEW_COMMENT", "请补全附件");
-    }
-
-    @Test
     void partyAddressFieldsRoundTripUpdateClearAndStayOutOfLists() {
         TuxedoResponse created = client.call("CNAPS5701E", request(Map.of(
             "PAYER_ADDRESS", "付款地址-原值",
@@ -543,7 +455,7 @@ class MockTuxedoClientV03ContractTest {
             .containsEntry("PAYEE_ADDRESS", "收款地址-原值")
             .containsEntry("PAYER_BANK_NAME", "");
 
-        for (String service : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+        for (String service : List.of("CNAPS4609Q")) {
             Map<String, Object> record = records(page(client.call(service, request(Map.of())))).get(0);
             assertThat(record).doesNotContainKeys("PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME");
         }

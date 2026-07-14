@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class JoltTuxedoClientTest {
     @Test
     void omitsOperatorNoFromPagedVoucherQueryRequests() {
-        for (String serviceName : List.of("CNAPS4609Q", "CNAPS5702Q")) {
+        for (String serviceName : List.of("CNAPS4609Q")) {
             JoltRemoteService.reset();
             TuxedoResponse response = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"))
                 .call(

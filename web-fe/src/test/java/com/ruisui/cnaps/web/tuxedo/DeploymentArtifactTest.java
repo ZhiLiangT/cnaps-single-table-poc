@@ -1,3 +1,4 @@
+
 package com.ruisui.cnaps.web.tuxedo;
 
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeploymentArtifactTest {
     private static final String[] EXPORTED_SERVICES = {
         "SYSHEALTH", "DICTQRY", "BANKQRY", "CNAPS5701E", "CNAPS5701U", "CNAPS5701D",
-        "CNAPS4609Q", "CNAPS5702Q", "CNAPS5702I", "CNAPS5702A", "CNAPS5702R"
+        "CNAPS4609Q", "CNAPS5702I"
     };
     private static final String[] VOUCHER_RECORD_FIELDS = {
         "BILL_ID", "WORK_DATE", "BRANCH_NO", "OPERATOR_NO", "SERIAL_NO", "BUSINESS_TYPE",
@@ -38,7 +39,7 @@ class DeploymentArtifactTest {
             .contains("//127.0.0.1:8000")
             .contains("SYSHEALTH")
             .contains("CNAPS5701E")
-            .contains("CNAPS5702R");
+            .doesNotContain("CNAPS5702Q", "CNAPS5702A", "CNAPS5702R");
     }
 
     @Test
@@ -53,16 +54,14 @@ class DeploymentArtifactTest {
             .contains("CNAPS5701U")
             .contains("CNAPS5701D")
             .contains("CNAPS4609Q")
-            .contains("CNAPS5702Q")
             .contains("CNAPS5702I")
-            .contains("CNAPS5702A")
-            .contains("CNAPS5702R")
             .contains("REQUEST_ID")
             .contains("RESP_CODE")
             .contains("RESP_MSG")
             .contains("BILL_ID")
             .contains("PAYEE_ACCT")
-            .contains("TOTAL_ELEMENTS");
+            .contains("TOTAL_ELEMENTS")
+            .doesNotContain("service=CNAPS5702Q", "service=CNAPS5702A", "service=CNAPS5702R");
     }
 
     @Test
@@ -102,7 +101,7 @@ class DeploymentArtifactTest {
     void voucherListMetadataUsesRangeOnlyWorkDateInputs() throws Exception {
         String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
 
-        for (String service : new String[] {"CNAPS4609Q", "CNAPS5702Q"}) {
+        for (String service : new String[] {"CNAPS4609Q"}) {
             assertScalarParam(metadata, service, "START_WORK_DATE", "string", "in");
             assertScalarParam(metadata, service, "END_WORK_DATE", "string", "in");
             assertRepeatedParam(metadata, service, "WORK_DATE", "string", "out");
@@ -144,12 +143,7 @@ class DeploymentArtifactTest {
                 case "BRANCH_NO", "STATUS", "SERIAL_NO", "VOUCHER_NO", "PAYEE_NAME", "PAYEE_ACCT" -> "inout";
                 default -> "out";
             };
-            String reviewAccess = switch (field) {
-                case "BRANCH_NO", "SERIAL_NO" -> "inout";
-                default -> "out";
-            };
             assertRepeatedParam(metadata, "CNAPS4609Q", field, type, generalAccess);
-            assertRepeatedParam(metadata, "CNAPS5702Q", field, type, reviewAccess);
         }
     }
 
@@ -164,7 +158,7 @@ class DeploymentArtifactTest {
         };
 
         for (String service : new String[] {
-            "CNAPS5701E", "CNAPS5701U", "CNAPS5701D", "CNAPS5702I", "CNAPS5702A", "CNAPS5702R"
+            "CNAPS5701E", "CNAPS5701U", "CNAPS5701D", "CNAPS5702I"
         }) {
             assertScalarParam(metadata, service, "REQUEST_ID", "string", "inout");
             assertScalarParam(metadata, service, "REQ_ID", "string", "inout");
@@ -178,9 +172,6 @@ class DeploymentArtifactTest {
         }
 
         assertScalarParam(metadata, "CNAPS5701D", "DELETE_REASON", "string", "inout");
-        assertScalarParam(metadata, "CNAPS5702A", "REVIEW_COMMENT", "string", "inout");
-        assertScalarParam(metadata, "CNAPS5702R", "REJECT_REASON", "string", "inout");
-        assertScalarParam(metadata, "CNAPS5702R", "REVIEW_COMMENT", "string", "inout");
     }
 
     @Test
@@ -198,7 +189,6 @@ class DeploymentArtifactTest {
             assertScalarParam(metadata, "CNAPS5701U", field, "string", "in");
             assertScalarParam(metadata, "CNAPS5702I", field, "string", "out");
             assertThat(serviceMetadata(metadata, "CNAPS4609Q")).doesNotContain("param=" + field);
-            assertThat(serviceMetadata(metadata, "CNAPS5702Q")).doesNotContain("param=" + field);
         }
     }
 
@@ -215,9 +205,6 @@ class DeploymentArtifactTest {
         assertScalarParam(metadata, "CNAPS4609Q", "PAGE_NO", "long", "inout");
         assertScalarParam(metadata, "CNAPS4609Q", "PAGE_SIZE", "long", "inout");
         assertScalarParam(metadata, "CNAPS4609Q", "TOTAL_ELEMENTS", "long", "out");
-        assertScalarParam(metadata, "CNAPS5702Q", "PAGE_NO", "long", "inout");
-        assertScalarParam(metadata, "CNAPS5702Q", "PAGE_SIZE", "long", "inout");
-        assertScalarParam(metadata, "CNAPS5702Q", "TOTAL_ELEMENTS", "long", "out");
 
         for (String service : EXPORTED_SERVICES) {
             assertScalarParam(metadata, service, "RESP_CODE", "string", "outerr");

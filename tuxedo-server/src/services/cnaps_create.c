@@ -134,7 +134,7 @@ static void row_from_create_request(FBFR32 *fbfr, cnaps_voucher_row *row, const 
     copy_text(fbfr, CNAPS_F_VOUCHER_NO, row->voucher_no, sizeof(row->voucher_no), "");
     copy_text(fbfr, CNAPS_F_REMARK, row->remark, sizeof(row->remark), "");
     copy_text(fbfr, CNAPS_F_REQ_ID, row->last_request_id, sizeof(row->last_request_id), "");
-    snprintf(row->status, sizeof(row->status), "%s", CNAPS_STATUS_PENDING_REVIEW);
+    snprintf(row->status, sizeof(row->status), "%s", CNAPS_STATUS_DRAFT);
     snprintf(row->last_action, sizeof(row->last_action), "%s", "CREATE");
     snprintf(row->last_operator_no, sizeof(row->last_operator_no), "%s", row->operator_no);
     row->version_no = 1;

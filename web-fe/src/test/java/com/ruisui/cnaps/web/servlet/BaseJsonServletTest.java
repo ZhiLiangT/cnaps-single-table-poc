@@ -73,7 +73,7 @@ class BaseJsonServletTest {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
-        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
+        for (String path : List.of("/api/cnaps/vouchers/query")) {
             captured.set(null);
             servlet.doPost(
                 jsonRequest(path, path.substring(19), "{}"),
@@ -90,7 +90,7 @@ class BaseJsonServletTest {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);
 
-        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
+        for (String path : List.of("/api/cnaps/vouchers/query")) {
             captured.set(null);
             servlet.doPost(
                 jsonRequest(
@@ -137,7 +137,7 @@ class BaseJsonServletTest {
             "{\"workDate\":null}"
         );
 
-        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
+        for (String path : List.of("/api/cnaps/vouchers/query")) {
             for (String filter : retiredFilters) {
                 captured.set(null);
                 ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -180,7 +180,7 @@ class BaseJsonServletTest {
             "{\"startWorkDate\":\"2026-07-12\",\"endWorkDate\":\"2026-07-10\"}"
         );
 
-        for (String path : List.of("/api/cnaps/vouchers/query", "/api/cnaps/vouchers/review-list")) {
+        for (String path : List.of("/api/cnaps/vouchers/query")) {
             for (String filter : invalidFilters) {
                 captured.set(null);
                 ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -213,6 +213,28 @@ class BaseJsonServletTest {
             AtomicInteger status = new AtomicInteger();
             servlet.doGet(
                 request(path, path.equals("/api/cnaps/vouchers") ? null : path.substring(19), Map.of()),
+                response(new ByteArrayOutputStream(), status)
+            );
+
+            assertThat(status.get()).as(path).isEqualTo(405);
+            assertThat(captured.get()).as(path).isNull();
+        }
+    }
+
+    @Test
+    void rejectsRemovedReviewPostsWithoutCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        for (String path : List.of(
+            "/api/cnaps/vouchers/review-list",
+            "/api/cnaps/vouchers/BILL-1/review-pass",
+            "/api/cnaps/vouchers/BILL-1/review-return"
+        )) {
+            captured.set(null);
+            AtomicInteger status = new AtomicInteger();
+            servlet.doPost(
+                jsonRequest(path, path.substring(19), "{}"),
                 response(new ByteArrayOutputStream(), status)
             );
 

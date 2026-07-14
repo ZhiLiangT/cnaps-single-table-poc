@@ -10,8 +10,8 @@ import java.util.Map;
 public class JoltTuxedoClient implements TuxedoClient {
     private static final int MAX_RESPONSE_OCCURRENCES = 1_000;
     private static final List<String> ENVELOPE_FIELDS = List.of("RESP_CODE", "RESP_MSG");
-    private static final List<String> PAGE_SERVICES = List.of("BANKQRY", "CNAPS4609Q", "CNAPS5702Q");
-    private static final List<String> OPERATOR_NO_OUTPUT_ONLY_SERVICES = List.of("CNAPS4609Q", "CNAPS5702Q");
+    private static final List<String> PAGE_SERVICES = List.of("BANKQRY", "CNAPS4609Q");
+    private static final List<String> OPERATOR_NO_OUTPUT_ONLY_SERVICES = List.of("CNAPS4609Q");
     private static final List<String> DICTIONARY_FIELDS = List.of(
         "DICT_TYPE", "DICT_CODE", "DICT_NAME", "SORT_NO"
     );

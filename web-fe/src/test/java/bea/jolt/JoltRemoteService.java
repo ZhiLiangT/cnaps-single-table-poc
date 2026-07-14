@@ -22,7 +22,7 @@ public class JoltRemoteService {
     }
 
     public void setString(String name, String value) {
-        if (("CNAPS4609Q".equals(serviceName) || "CNAPS5702Q".equals(serviceName))
+        if ("CNAPS4609Q".equals(serviceName)
             && "OPERATOR_NO".equals(name)) {
             throw new IllegalArgumentException(name);
         }

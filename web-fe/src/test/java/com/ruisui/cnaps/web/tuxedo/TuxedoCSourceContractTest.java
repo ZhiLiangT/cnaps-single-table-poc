@@ -72,16 +72,13 @@ class TuxedoCSourceContractTest {
     }
 
     @Test
-    void nativeLifecycleChecksStateAndDoesNotRejectSameOperator() throws Exception {
+    void nativeLifecycleAllowsOnlyDraftMutation() throws Exception {
         String update = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_update.c"));
         String delete = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_delete.c"));
-        String review = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_review.c"));
 
-        assertThat(update).contains("CNAPS_STATUS_PENDING_REVIEW", "CNAPS_STATUS_REJECTED", "3003");
-        assertThat(delete).contains("CNAPS_STATUS_PENDING_REVIEW", "CNAPS_STATUS_REJECTED", "3003");
-        assertThat(review)
-            .contains("CNAPS_STATUS_PENDING_REVIEW", "3004")
-            .doesNotContain("3005", "strcmp(row.operator_no, row.checker_no)");
+        assertThat(update).contains("CNAPS_STATUS_DRAFT", "3003");
+        assertThat(delete).contains("CNAPS_STATUS_DRAFT", "3003");
+        assertThat(root.resolve("tuxedo-server/src/services/cnaps_review.c")).doesNotExist();
     }
 
     @Test
@@ -220,7 +217,7 @@ class TuxedoCSourceContractTest {
             "CNAPS_QUERY_MAX_ROWS", "page_no = 1", "page_size = 10",
             "CNAPS_F_SERIAL_NO", "CNAPS_F_VOUCHER_NO", "CNAPS_F_PAYEE_NAME",
             "CNAPS_F_PAYEE_ACCT", "CNAPS_F_INCLUDE_DELETED",
-            "CNAPS_STATUS_PENDING_REVIEW", "cnaps_put_voucher_occurrence",
+            "cnaps_put_voucher_occurrence",
             "CNAPS_F_PAGE_NO", "CNAPS_F_PAGE_SIZE", "CNAPS_F_TOTAL_ELEMENTS"
         );
     }
@@ -270,7 +267,7 @@ class TuxedoCSourceContractTest {
         assertThat(query.split(
             "cnaps_reserve_response_buffer\\(rqst, CNAPS_QUERY_RESPONSE_BUFFER_SIZE\\)",
             -1
-        )).hasSize(3);
+        )).hasSize(2);
         assertThat(bank.indexOf("cnaps_reserve_response_buffer"))
             .isLessThan(bank.indexOf("cnaps_put_long(fbfr, CNAPS_F_PAGE_NO"));
         assertThat(query.indexOf("cnaps_reserve_response_buffer"))
@@ -357,8 +354,8 @@ class TuxedoCSourceContractTest {
                 "char raw_work_date[513]",
                 "char work_date[11]"
             );
-        assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_START_WORK_DATE")).isEqualTo(2);
-        assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_END_WORK_DATE")).isEqualTo(2);
+        assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_START_WORK_DATE")).isEqualTo(1);
+        assertThat(countOccurrences(query, "get_field(fbfr, CNAPS_F_END_WORK_DATE")).isEqualTo(1);
         assertThat(db).contains(
             "(:start_work_date IS NULL OR WORK_DATE>=TO_DATE(:start_work_date, 'YYYY-MM-DD'))",
             "(:end_work_date IS NULL OR WORK_DATE<=TO_DATE(:end_work_date, 'YYYY-MM-DD')+(86399/86400))"
@@ -371,16 +368,12 @@ class TuxedoCSourceContractTest {
     }
 
     @Test
-    void nativeBankKeywordMatchesNumberAndReviewReturnKeepsComment() throws Exception {
+    void nativeBankKeywordMatchesNumber() throws Exception {
         String bank = Files.readString(root.resolve("tuxedo-server/src/services/bank_query.c"));
-        String review = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_review.c"));
 
         assertThat(bank).contains(
             "strstr(bank_name, keyword) != NULL || strstr(bank_no, keyword) != NULL"
         );
-        assertThat(review)
-            .contains("snprintf(row.review_comment, sizeof(row.review_comment), \"%s\", review_comment)")
-            .doesNotContain("row.review_comment[0] = '\\0';");
     }
 
     @Test
@@ -404,10 +397,10 @@ class TuxedoCSourceContractTest {
         ).doesNotContain(
             "overlay_field(fbfr, CNAPS_F_WORK_DATE, row.work_date, sizeof(row.work_date))"
         );
-        assertThat(countOccurrences(query, "char raw_start_work_date[513]")).isEqualTo(2);
-        assertThat(countOccurrences(query, "char raw_end_work_date[513]")).isEqualTo(2);
-        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_start_work_date)")).isEqualTo(2);
-        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_end_work_date)")).isEqualTo(2);
+        assertThat(countOccurrences(query, "char raw_start_work_date[513]")).isEqualTo(1);
+        assertThat(countOccurrences(query, "char raw_end_work_date[513]")).isEqualTo(1);
+        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_start_work_date)")).isEqualTo(1);
+        assertThat(countOccurrences(query, "!cnaps_valid_work_date(raw_end_work_date)")).isEqualTo(1);
     }
 
     @Test

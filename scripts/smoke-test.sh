@@ -32,7 +32,7 @@ fi
 
 curl -fsS -X POST "$BASE_URL/api/cnaps/vouchers/query" \
   -H "Content-Type: application/json; charset=UTF-8" \
-  -d '{"status":"10_PENDING_REVIEW"}'
+  -d '{"status":"00_DRAFT"}'
 curl -fsS "$BASE_URL/api/cnaps/vouchers/$bill_id"
 curl -fsS -X PUT "$BASE_URL/api/cnaps/vouchers/$bill_id" \
   -H "Content-Type: application/json; charset=UTF-8" \

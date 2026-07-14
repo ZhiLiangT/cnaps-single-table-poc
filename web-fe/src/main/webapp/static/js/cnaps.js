@@ -30,13 +30,3 @@ document.querySelector("[data-query-form]")?.addEventListener("submit", async (e
     body: JSON.stringify(body)
   }));
 });
-
-document.querySelector("[data-review-form]")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = Object.fromEntries(new FormData(event.currentTarget).entries());
-  await show(await fetch(`api/cnaps/vouchers/${form.billId}/review-pass`, {
-    method: "POST",
-    headers: jsonHeaders,
-    body: JSON.stringify({ reviewComment: form.reviewComment })
-  }));
-});

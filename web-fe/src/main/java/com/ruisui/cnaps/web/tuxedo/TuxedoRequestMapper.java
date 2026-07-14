@@ -30,8 +30,6 @@ public class TuxedoRequestMapper {
         Map.entry("voucherNo", "VOUCHER_NO"),
         Map.entry("remark", "REMARK"),
         Map.entry("status", "STATUS"),
-        Map.entry("rejectReason", "REJECT_REASON"),
-        Map.entry("reviewComment", "REVIEW_COMMENT"),
         Map.entry("deleteReason", "DELETE_REASON"),
         Map.entry("pageNo", "PAGE_NO"),
         Map.entry("pageSize", "PAGE_SIZE"),
@@ -57,26 +55,16 @@ public class TuxedoRequestMapper {
         if ("POST".equals(verb) && "/api/cnaps/vouchers/query".equals(cleanPath)) {
             return "CNAPS4609Q";
         }
-        if ("POST".equals(verb) && "/api/cnaps/vouchers/review-list".equals(cleanPath)) {
-            return "CNAPS5702Q";
-        }
         if (cleanPath.startsWith("/api/cnaps/vouchers/")) {
             if ("PUT".equals(verb)) {
                 return "CNAPS5701U";
             }
             if ("GET".equals(verb)
-                && !"/api/cnaps/vouchers/query".equals(cleanPath)
-                && !"/api/cnaps/vouchers/review-list".equals(cleanPath)) {
+                && !"/api/cnaps/vouchers/query".equals(cleanPath)) {
                 return "CNAPS5702I";
             }
             if ("POST".equals(verb) && cleanPath.endsWith("/delete")) {
                 return "CNAPS5701D";
-            }
-            if ("POST".equals(verb) && cleanPath.endsWith("/review-pass")) {
-                return "CNAPS5702A";
-            }
-            if ("POST".equals(verb) && cleanPath.endsWith("/review-return")) {
-                return "CNAPS5702R";
             }
         }
         throw new IllegalArgumentException("Unsupported WebFE operation: " + method + " " + path);

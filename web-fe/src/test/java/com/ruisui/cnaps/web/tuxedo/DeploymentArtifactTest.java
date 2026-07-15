@@ -485,15 +485,11 @@ class DeploymentArtifactTest {
     }
 
     @Test
-    void voucherListCallersUsePostJsonBodies() throws Exception {
-        String script = Files.readString(root.resolve("web-fe/src/main/webapp/static/js/cnaps.js"));
+    void voucherListBackendArtifactsUsePostJsonBodies() throws Exception {
         String smoke = Files.readString(root.resolve("scripts/smoke-test.sh"));
         String frontendApi = Files.readString(root.resolve("docs/cnaps-frontend-api.md"));
         String databaseApi = Files.readString(root.resolve("docs/cnaps-api-database.md"));
 
-        assertThat(script)
-            .contains("fetch(\"api/cnaps/vouchers/query\"", "method: \"POST\"", "JSON.stringify(body)")
-            .doesNotContain("api/cnaps/vouchers?");
         assertThat(smoke)
             .contains("/api/cnaps/vouchers/query", "-X POST", "Content-Type: application/json")
             .doesNotContain("/api/cnaps/vouchers?status=");
@@ -540,14 +536,21 @@ class DeploymentArtifactTest {
     }
 
     @Test
-    void createPageSubmitsWorkDateWithoutBusinessHeaders() throws Exception {
-        String page = Files.readString(root.resolve("web-fe/src/main/webapp/cnaps-create.jsp"));
-        String script = Files.readString(root.resolve("web-fe/src/main/webapp/static/js/cnaps.js"));
+    void webApplicationContainsOnlyBackendDeploymentDescriptor() throws Exception {
+        Path webapp = root.resolve("web-fe/src/main/webapp");
+        String webXml = Files.readString(webapp.resolve("WEB-INF/web.xml"));
+        String pom = Files.readString(root.resolve("web-fe/pom.xml"));
 
-        assertThat(page).contains("name=\"workDate\"");
-        assertThat(script)
-            .contains("\"Content-Type\": \"application/json; charset=UTF-8\"")
-            .doesNotContain("requestId:", "operatorNo:", "branchNo:", "workDate:");
+        try (var files = Files.walk(webapp)) {
+            assertThat(files
+                .filter(Files::isRegularFile)
+                .map(webapp::relativize)
+                .map(path -> path.toString().replace('\\', '/'))
+                .toList())
+                .containsExactly("WEB-INF/web.xml");
+        }
+        assertThat(webXml).doesNotContain("<welcome-file-list>", ".jsp");
+        assertThat(pom).doesNotContain("javax.servlet.jsp", "jsp-api");
     }
 
     @Test

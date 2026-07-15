@@ -1,6 +1,6 @@
 # CNAPS 凭证审核设计（POC 生产代码执行版）
 
-> 版本：v1.4 ｜ 日期：2026-07-15 ｜ 需求：`docs/cnaps-review-requirements.md` v1.4
+> 版本：v1.5 ｜ 日期：2026-07-15 ｜ 需求：`docs/cnaps-review-requirements.md` v1.4
 
 ## 1. OpenCode 执行目标
 
@@ -335,12 +335,15 @@ WHERE BILL_ID=:bill_id AND NVL(VERSION_NO, 1)=:version_no
 
 ### 9.1 `cnapspocsvr.c`
 
-在现有服务函数声明区增加：
+必须使用锚点局部插入，不得用字符串替换覆盖原声明。预期补丁为：
 
-```c
-void CNAPS5702A(TPSVCINFO *rqst);
-void CNAPS5702R(TPSVCINFO *rqst);
+```diff
+ void CNAPS5702I(TPSVCINFO *rqst);
++void CNAPS5702A(TPSVCINFO *rqst);
++void CNAPS5702R(TPSVCINFO *rqst);
 ```
+
+修改后 `CNAPS5702I`、`CNAPS5702A`、`CNAPS5702R` 必须各出现一次。该文件预期仅增加 2 行，不删除任何行。
 
 ### 9.2 `tuxedo-server/Makefile`
 
@@ -363,7 +366,9 @@ CNAPS5702R
 
 ### 9.4 `tuxedo/jolt/cnaps_services.bulk`
 
-参考现有 `CNAPS5701D` 的公共输入和错误字段，但只声明审核动作所需字段。增加两个结构相同的 service 块，服务名分别为 `CNAPS5702A` 和 `CNAPS5702R`：
+参考现有 `CNAPS5701D` 的公共输入和错误字段，但只声明审核动作所需字段。只能在文件末尾追加两个 service 块；禁止解析后重新生成、全量写回、格式化或修改任何已有 service。现有 repeated 字段的 `count=0` 必须全部保留。
+
+追加的两个块服务名分别为 `CNAPS5702A` 和 `CNAPS5702R`：
 
 ```text
 service=CNAPS5702A
@@ -410,6 +415,15 @@ access=outerr
 
 复制该块并只把 `service` 改为 `CNAPS5702R`。不要增加完整凭证字段、reason/comment 字段或 `CNAPS5702Q` 块。
 
+该文件预期变更为 82 行新增、0 行删除。修改后必须满足：
+
+```text
+service=CNAPS5702A 恰好 1 个
+service=CNAPS5702R 恰好 1 个
+DICT_TYPE 后仍包含 count=0
+所有原有 service 块内容保持不变
+```
+
 ## 10. 最终代码行为
 
 ### 10.1 待审核列表
@@ -438,7 +452,7 @@ URL billId
 
 错误结果：不存在返回 `3001`；状态不允许或并发版本变化返回 `3004`；数据库错误返回 `4001`。
 
-## 11. OpenCode 改动边界
+## 11. OpenCode 改动与验证边界
 
 完成第 2 节八个文件后停止，不进行以下扩展：
 
@@ -446,5 +460,42 @@ URL billId
 - 不重构现有 CRUD、查询、Jolt 客户端和响应映射。
 - 不增加前端、权限、审核原因、批量审核或历史流水。
 - 不修改与本功能无关的文件。
+
+### 11.1 低成本结构检查
+
+完成编辑后先检查 diff，不要立即启动 Maven：
+
+```bash
+git diff --check
+git diff --numstat -- tuxedo-server/src/cnapspocsvr.c
+git diff --numstat -- tuxedo/jolt/cnaps_services.bulk
+grep -c '^void CNAPS5702I' tuxedo-server/src/cnapspocsvr.c
+grep -c '^void CNAPS5702A' tuxedo-server/src/cnapspocsvr.c
+grep -c '^void CNAPS5702R' tuxedo-server/src/cnapspocsvr.c
+grep -c '^service=CNAPS5702A$' tuxedo/jolt/cnaps_services.bulk
+grep -c '^service=CNAPS5702R$' tuxedo/jolt/cnaps_services.bulk
+grep -A3 '^param=DICT_TYPE$' tuxedo/jolt/cnaps_services.bulk
+```
+
+预期：三个声明计数均为 1，两个 service 计数均为 1，`DICT_TYPE` 输出包含 `count=0`；`cnapspocsvr.c` 为 2 行新增、0 行删除，bulk 为 82 行新增、0 行删除。任何一个结果不符时，只修复对应文件，不进入 Maven。
+
+### 11.2 唯一 Maven 命令
+
+结构检查通过后只执行一次：
+
+```bash
+mvn -f web-fe/pom.xml clean package
+```
+
+不要先执行 `-DskipTests package` 再执行完整 Maven。现有测试用于发现 metadata 等既有内容被误改，不要求新增或修改审核测试。
+
+### 11.3 C 工具链能力判断
+
+只有当前机器同时具备 `buildserver`、Tuxedo `atmi.h` 和 Oracle SDK `oci.h` 时才执行 C 编译。缺少任一项时：
+
+- 不运行 `make`。
+- 不追查 C LSP 对外部头文件的报错。
+- 不修改 include 或业务代码来规避环境缺失。
+- 在最终反馈中记录“当前环境缺少 Tuxedo/Oracle C 工具链，未执行原生编译”。
 
 最终反馈只需列出实际修改文件和三个 API 的实现结果。

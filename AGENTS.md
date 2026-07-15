@@ -65,9 +65,12 @@ For `tuxedo/jolt/cnaps_services.bulk`:
 
 ## Environment and Verification
 
-- The current machine may not have Tuxedo `buildserver`, Tuxedo headers, or Oracle SDK headers.
-- Do not run native C LSP diagnostics or `make` unless `buildserver`, `atmi.h`, and `oci.h` are all available.
-- Missing external C headers or `buildserver` are known environment limitations; do not modify project code to silence them.
+- The Linux POC VM has Tuxedo `buildserver`, Tuxedo headers, and Oracle SDK headers installed under `/opt`.
+- Compile native C only through `./scripts/build-c.sh` from the repository root.
+- Never invoke `make` or `buildserver` directly. The build script loads `conf/env.linux.sh`, `conf/tuxedo.env`, and `conf/db.env` before invoking Make.
+- Do not use the login-shell `PATH` or a raw `command -v buildserver` result to decide that Tuxedo is missing; `/opt/tuxedo/bin` is added by `conf/tuxedo.env`.
+- C LSP diagnostics for missing external headers are not authoritative unless the same error is produced by `./scripts/build-c.sh`.
+- If `./scripts/build-c.sh` fails, report its exact error. Do not modify include paths or business code merely to silence editor diagnostics.
 - After all eight files are complete, run the cheap structural checks first:
   - `git diff --check`
   - verify `CNAPS5702I`, `CNAPS5702A`, and `CNAPS5702R` declarations each occur once
@@ -76,6 +79,7 @@ For `tuxedo/jolt/cnaps_services.bulk`:
   - verify the metadata diff has additions only
 - Run Maven once after the structural checks: `mvn -f web-fe/pom.xml clean package`.
 - Do not run a preliminary `-DskipTests` package followed by another full Maven run.
+- After Maven succeeds on the Linux POC VM, run `./scripts/build-c.sh` exactly once for native C verification.
 
 ## Completion Rules
 

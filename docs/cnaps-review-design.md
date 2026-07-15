@@ -1,344 +1,349 @@
-# CNAPS 凭证审核功能设计文档
+# CNAPS 凭证审核功能设计文档（POC 最小实现）
 
-> 文档版本：v1.0  
-> 编写日期：2026-07-15  
-> 设计状态：待评审  
-> 对应需求：`docs/cnaps-review-requirements.md`  
-> API 基线：`docs/cnaps-frontend-api.md` v0.5（以当前工作区内容为准）
+> 文档版本：v1.2<br>
+> 编写日期：2026-07-15<br>
+> 设计状态：待评审<br>
+> 对应需求：`docs/cnaps-review-requirements.md` v1.2<br>
+> API 基线：`docs/cnaps-frontend-api.md` v0.5
 
-## 1. 设计目标
+## 1. 文档目标
 
-本设计在不引入新前端框架、不改变现有 Java/Tuxedo/Oracle 技术栈的前提下，实现可编译、可测试、可完整部署的单级凭证审核功能。设计覆盖：
-
-- JSP/JavaScript/CSS 审核页面和状态列表。
-- Servlet 路由和 HTTP 契约。
-- HTTP 与 Tuxedo 服务名、FML32 字段之间的映射。
-- Mock 模式审核行为。
-- Jolt 分页响应读取。
-- Tuxedo C 待审核查询和审核状态变更。
-- Oracle 乐观并发控制和审计字段。
-- TUXCONFIG、Jolt metadata、测试、冒烟和部署。
-
-本文档以当前 API 文档为唯一外部契约。项目中较早的数据库/API 说明仍包含审核意见、退回原因等历史设计，这些内容不作为本次实现依据。
-
-## 2. 当前架构与基线差距
-
-### 2.1 运行架构
-
-```mermaid
-flowchart LR
-    U["浏览器 / JSP"] -->|HTTP JSON| W["Tomcat WebFE"]
-    W --> M["TuxedoRequestMapper"]
-    M --> J["Jolt Client"]
-    J -->|FML32| T["Tuxedo C Services"]
-    T -->|OCI| O["Oracle T_CNAPS_BILL_POC"]
-    O --> T --> J --> W --> U
-```
-
-本地或测试环境可将 Jolt Client 替换为 `MockTuxedoClient`，但 HTTP 契约和状态流转必须保持一致。
-
-### 2.2 当前已具备能力
-
-- 创建和修改后状态为 `10_PENDING_REVIEW`。
-- `cnaps_status.h` 已定义四个有效状态。
-- `cnaps_status_can_edit` 和 `cnaps_status_can_review` 已存在。
-- 数据库表已有 `CHECKER_NO`、`CHECKER_TIME`、审计字段和 `VERSION_NO`。
-- `db_update_voucher` 已使用 `BILL_ID + VERSION_NO` 进行乐观更新。
-- `sql/050_enable_voucher_review.sql` 和迁移脚本已经能够清理历史 `00_DRAFT`。
-- API 文档已定义审核列表、审核通过和审核退回。
-
-### 2.3 当前缺口
-
-| 层次 | 当前行为 | 本次设计 |
-| --- | --- | --- |
-| 页面 | 无审核页；查询输出原始 JSON | 新增结构化审核页和状态表格 |
-| JavaScript | 只有健康、创建、通用查询 | 增加列表、分页、详情、通过、退回和统一错误处理 |
-| Servlet | 三个审核 POST 返回 405 | 放行审核 POST，保留旧 GET 为 405 |
-| 请求映射 | 无 `CNAPS5702Q/A/R` 映射 | 恢复三个服务映射 |
-| Mock | 不支持审核服务 | 实现列表和两种审核动作 |
-| Jolt | 不把审核列表识别为分页服务 | 将 `CNAPS5702Q` 加入分页读取 |
-| C 服务 | 审核服务源文件已删除 | 恢复并按“无请求体”契约改造 |
-| 服务注册 | Makefile、主程序、UBBCONFIG 无审核服务 | 注册三个审核服务 |
-| Jolt metadata | 无审核服务定义 | 恢复三个定义，去除原因/意见输入 |
-| 自动化测试 | 当前断言审核端点已移除 | 改为断言审核链路可用 |
-| 冒烟测试 | 不覆盖审核 | 覆盖通过、退回及状态查询 |
-
-## 3. 核心设计决策
-
-### 3.1 保持单级审核
-
-状态仍为待审核、审核通过、审核退回和已删除四种，不增加中间状态或多级审核字段。
-
-### 3.2 审核接口无请求体
-
-`review-pass` 和 `review-return` 仅依赖路径中的 `billId` 以及 WebFE 注入的操作员、机构和请求流水。前端不发送 `{}`，也不发送审核意见或退回原因。`JsonSupport.readBodyMap` 已支持 `Content-Length=0` 并返回空 Map，因此 Servlet 无需特殊解析器。
-
-### 3.3 服务端状态为唯一真相
-
-前端只在收到 `respCode=0000` 后提示成功，随后刷新列表。遇到超时或网络失败不自动重试副作用请求。服务端通过当前状态和 `VERSION_NO` 防止重复或并发审核。
-
-### 3.4 审核页面只处理待审核记录
-
-审核页调用专用 `review-list`，后端强制状态为 `10_PENDING_REVIEW`。全部状态由通用查询页展示，避免通过客户端参数绕过审核列表语义。
-
-### 3.5 保留内部历史列，不公开历史输入字段
-
-Oracle、FML 结构和 C 行结构可继续保留 `REVIEW_COMMENT`、`REJECT_REASON`、`DELETE_REASON`，避免破坏性 DDL 和二进制字段号变更。但本次审核服务不读取这些输入，公开 JSON 响应也不应依赖这些字段。
-
-建议在 `TuxedoResponseMapper` 中建立内部字段排除集合，至少排除：
+本文档用于指导 OpenCode 或开发人员直接完成后端 POC 编码、测试和部署。设计重点是用最少改动验证以下闭环：
 
 ```text
-REVIEW_COMMENT
-REJECT_REASON
-DELETE_REASON
+待审核列表 -> 审核通过
+待审核列表 -> 审核退回 -> 修改 -> 再次待审核
 ```
 
-同时从新增审核服务的 Jolt 输入定义中去除这些字段。若为了现有 Jolt 输出兼容仍传输这些字段，响应映射层也必须过滤，保证当前 `cnaps-frontend-api.md` 契约稳定。
+本设计保留三个 HTTP API，但不为三个 API 分别开发三套底层服务。待审核列表复用现有查询服务，只新增两个状态变更服务。
 
-## 4. 端到端接口映射
+## 2. POC 技术决策
 
-| HTTP 操作 | WebFE 路径 | Tuxedo 服务 | C 入口 | 成功目标 |
-| --- | --- | --- | --- | --- |
-| 待审核查询 | `POST /api/cnaps/vouchers/review-list` | `CNAPS5702Q` | `CNAPS5702Q` | 返回仅待审核分页记录 |
-| 审核通过 | `POST /api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` | `CNAPS5702A` | `20_REVIEW_APPROVED` |
-| 审核退回 | `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` | `CNAPS5702R` | `30_REVIEW_REJECTED` |
-| 凭证详情 | `GET /api/cnaps/vouchers/{billId}` | `CNAPS5702I` | `CNAPS5702I` | 返回服务端最终状态 |
+### 2.1 服务复用
 
-`A` 表示 approve，`R` 表示 return，`Q` 表示 query。沿用这些已有传统服务名，避免重新分配服务号和修改外围配置约定。
+| HTTP API | WebFE 映射 | Tuxedo 实现 | 说明 |
+| --- | --- | --- | --- |
+| `POST /api/cnaps/vouchers/review-list` | `CNAPS4609Q` | 复用现有 `cnaps_query.c` | WebFE 强制 `STATUS=10_PENDING_REVIEW` |
+| `POST /api/cnaps/vouchers/{billId}/review-pass` | `CNAPS5702A` | 新增 `cnaps_review.c` | 状态改为审核通过 |
+| `POST /api/cnaps/vouchers/{billId}/review-return` | `CNAPS5702R` | 新增 `cnaps_review.c` | 状态改为审核退回 |
 
-## 5. 前端页面设计
+### 2.2 明确不做的改动
 
-### 5.1 文件设计
+以下内容不属于本次实现：
 
-| 文件 | 类型 | 设计动作 |
-| --- | --- | --- |
-| `web-fe/src/main/webapp/cnaps-review.jsp` | 新增 | 审核查询、列表、分页、详情和确认对话框 |
-| `web-fe/src/main/webapp/cnaps-query.jsp` | 修改 | 使用表格展示查询结果和状态 |
-| `web-fe/src/main/webapp/index.jsp` | 修改 | 增加审核导航 |
-| `web-fe/src/main/webapp/cnaps-create.jsp` | 修改 | 增加审核导航并标记当前页 |
-| `web-fe/src/main/webapp/static/js/cnaps.js` | 修改 | 增加公共 API、列表和审核逻辑 |
-| `web-fe/src/main/webapp/static/css/app.css` | 修改 | 表格、状态标签、分页、消息、详情和响应式样式 |
+- 不新增 `CNAPS5702Q`。
+- 不修改 `tuxedo-server/src/services/cnaps_query.c`。
+- 不修改 `web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/JoltTuxedoClient.java`。
+- 不修改 `web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/TuxedoResponseMapper.java`。
+- 不修改数据库表结构、FML 字段表和状态常量。
+- 不新增审核意见、退回原因、删除原因等请求字段。
+- 不修改 JSP、JavaScript、CSS 或其他页面资源。
+- 不引入框架、依赖、权限模型、消息通知或工作流引擎。
+- 不从历史提交整体恢复旧审核实现。
 
-保持单个 JavaScript 和 CSS 文件，不引入 npm、Webpack 或第三方库，避免改变 WAR 构建流程。
+现有 `CNAPS4609Q` 已具备状态筛选和分页能力，`JoltTuxedoClient` 已将它配置为分页服务；现有响应映射也已经支持本期所需的六个动作响应字段。因此这些代码无需扩展。
 
-### 5.2 页面结构
-
-建议 `cnaps-review.jsp` 使用以下语义结构和 `data-*` 钩子：
-
-```html
-<body data-context-path="${pageContext.request.contextPath}">
-  <main class="app-shell">
-    <nav class="top-nav" aria-label="主导航">...</nav>
-    <section class="workbench">
-      <h1>审核处理</h1>
-      <div data-page-message aria-live="polite"></div>
-      <form data-review-query-form>...</form>
-      <div data-list-summary></div>
-      <div class="table-scroll">
-        <table data-review-table>...</table>
-      </div>
-      <div data-review-empty hidden>暂无待审核凭证</div>
-      <nav data-review-pagination aria-label="审核列表分页">...</nav>
-    </section>
-    <section data-voucher-detail hidden>...</section>
-    <div data-confirm-dialog hidden role="dialog" aria-modal="true">...</div>
-  </main>
-</body>
-```
-
-不要求使用原生 `<dialog>`，以避免目标浏览器兼容性不确定。若使用自定义对话框，必须实现焦点进入、Escape 关闭、取消按钮和关闭后焦点恢复。
-
-### 5.3 审核页面线框
+## 3. 总体调用链
 
 ```text
-+------------------------------------------------------------------+
-| 首页 | 录入 | 查询 | 审核                                         |
-+------------------------------------------------------------------+
-| 审核处理                                                         |
-| [开始日期] [结束日期] [流水号] [每页10条 v] [查询] [重置]        |
-| 共 25 条，第 1/3 页                                              |
-|------------------------------------------------------------------|
-| 凭证编号 | 工作日期 | 流水 | 收款人 | 金额 | 状态 | 操作         |
-| B...     | 07-15    | ...  | 张三   | 100  | 待审核|详情 通过 退回|
-|------------------------------------------------------------------|
-| [上一页] 1 / 3 [下一页]                                         |
-+------------------------------------------------------------------+
-| 凭证详情（按需展开）                                             |
-+------------------------------------------------------------------+
+HTTP 请求
+  -> CnapsVoucherServlet
+     - 解析 JSON
+     - 校验列表日期
+     - review-list 强制写入待审核状态
+     - 动作路径提取 billId
+  -> TuxedoRequestMapper
+     - HTTP 路由映射服务名
+     - 注入可信 requestId/operatorNo/branchNo
+  -> MockTuxedoClient 或 JoltTuxedoClient
+  -> CNAPS4609Q / CNAPS5702A / CNAPS5702R
+  -> Oracle T_CNAPS_BILL_POC
+  -> TuxedoResponseMapper
+  -> HTTP JSON 响应
 ```
 
-### 5.4 状态展示模型
-
-JavaScript 中集中维护状态元数据，不得在多个页面重复硬编码：
-
-```javascript
-const voucherStatuses = Object.freeze({
-  "10_PENDING_REVIEW": { label: "待审核", tone: "pending" },
-  "20_REVIEW_APPROVED": { label: "审核通过", tone: "approved" },
-  "30_REVIEW_REJECTED": { label: "审核退回", tone: "rejected" },
-  "40_DELETED": { label: "已删除", tone: "deleted" }
-});
-```
-
-渲染状态时创建两个文本节点：中文标签和原始状态码。未知值使用 `tone="unknown"`，不推断操作权限。
-
-### 5.5 JavaScript 模块化结构
-
-项目不使用 ES module 打包，仍在 `cnaps.js` 内组织纯函数和页面初始化函数：
+### 3.1 待审核列表链路
 
 ```text
-基础层
-  contextPath()
-  apiUrl(path)
-  requestJson(path, options)
-  showMessage(type, text)
-  createTextCell(value)
-  formatAmount(value)
-  renderStatus(status)
-
-列表层
-  formToBody(form)
-  normalizePage(data)
-  renderVoucherRows(records, options)
-  updatePagination(page)
-
-页面层
-  initHealthPage()
-  initCreatePage()
-  initQueryPage()
-  initReviewPage()
+POST /review-list + 查询条件
+  -> Servlet 覆盖 status=10_PENDING_REVIEW
+  -> RequestMapper 映射 CNAPS4609Q
+  -> 现有分页查询
+  -> 返回 pageNo/pageSize/total/records
 ```
 
-`requestJson` 的建议行为：
+即使调用方在 Body 中传入其他 `status`，Servlet 也必须在解析完成后覆盖，不能信任客户端状态。
 
-1. 使用 `<body data-context-path>` 生成上下文相对 URL。
-2. 仅当存在 JSON body 时设置 `Content-Type` 并执行 `JSON.stringify`。
-3. 先读取响应文本，再尝试 JSON 解析，以便处理 Tomcat HTML 错误页。
-4. 只有 HTTP 成功且 `respCode === "0000"` 才返回成功数据。
-5. 抛出包含 `httpStatus`、`respCode`、`respMsg` 的结构化错误。
-6. 不把 200 但 `respCode != 0000` 当作成功。
+### 3.2 审核动作链路
 
-### 5.6 查询请求状态
-
-审核页维护以下页面状态：
-
-```javascript
-const reviewState = {
-  filters: { startWorkDate: "", endWorkDate: "", serialNo: "" },
-  pageNo: 1,
-  pageSize: 10,
-  total: 0,
-  records: [],
-  querySequence: 0,
-  busyBillIds: new Set()
-};
+```text
+POST /{billId}/review-pass 或 review-return
+  -> 路径提取 BILL_ID
+  -> 读取凭证和当前 VERSION_NO
+  -> 校验 STATUS=10_PENDING_REVIEW
+  -> 按 BILL_ID + VERSION_NO 更新
+  -> 重新读取凭证
+  -> 返回六个摘要字段
 ```
 
-- 每次查询递增 `querySequence`，响应返回时只有序号仍为最新才允许渲染。
-- `busyBillIds` 防止同一凭证重复点击，但不阻塞其他行。
-- 查询按钮和分页按钮在当前列表请求进行中禁用。
+## 4. 数据和状态设计
 
-### 5.7 DOM 安全
+### 4.1 复用数据库对象
 
-所有来自 API 的值通过 `document.createTextNode`、`element.textContent` 或 `createTextCell` 渲染。禁止使用包含服务端值的模板字符串赋给 `innerHTML`。审核 URL 中的 `billId` 使用：
+继续使用现有表：
 
-```javascript
-encodeURIComponent(record.billId)
+```text
+T_CNAPS_BILL_POC
 ```
 
-### 5.8 金额展示
+本期所需的字段已经存在：
 
-API 金额为字符串。页面只做展示格式规范化，不进行业务计算：
+| 字段 | 用途 |
+| --- | --- |
+| `BILL_ID` | 凭证主键 |
+| `STATUS` | 当前状态 |
+| `CHECKER_NO` | 最近审核人 |
+| `CHECKER_TIME` | 最近审核时间 |
+| `LAST_ACTION` | 最近动作 |
+| `LAST_OPERATOR_NO` | 最近操作人 |
+| `LAST_REQUEST_ID` | 最近请求号 |
+| `LAST_ACTION_TIME` | 最近动作时间 |
+| `UPDATED_AT` | 最近更新时间 |
+| `VERSION_NO` | 乐观锁版本 |
 
-- 合法的非负金额字符串按两位小数展示。
-- 无法解析的值原样以纯文本展示并记录为未知格式。
-- 不把金额转换后再传回服务端，避免 IEEE 754 精度问题。
+不执行 DDL，不增加列、索引或审核流水表。
 
-### 5.9 审核动作流程
+### 4.2 状态变化
 
-伪代码：
+| 动作 | 前置状态 | 目标状态 | `LAST_ACTION` |
+| --- | --- | --- | --- |
+| 审核通过 | `10_PENDING_REVIEW` | `20_REVIEW_APPROVED` | `REVIEW_PASS` |
+| 审核退回 | `10_PENDING_REVIEW` | `30_REVIEW_REJECTED` | `REVIEW_RETURN` |
 
-```javascript
-async function reviewVoucher(record, action) {
-  if (record.status !== "10_PENDING_REVIEW") return;
-  const confirmed = await confirmReview(record, action);
-  if (!confirmed || reviewState.busyBillIds.has(record.billId)) return;
+状态判断复用：
 
-  reviewState.busyBillIds.add(record.billId);
-  renderRowBusy(record.billId, true);
-  try {
-    const suffix = action === "pass" ? "review-pass" : "review-return";
-    await requestJson(
-      `/api/cnaps/vouchers/${encodeURIComponent(record.billId)}/${suffix}`,
-      { method: "POST" }
-    );
-    showMessage("success", action === "pass" ? "审核通过成功" : "审核退回成功");
-    await reloadCurrentOrPreviousPage();
-  } catch (error) {
-    showReviewError(error);
-    if (["3001", "3003", "3004"].includes(error.respCode)) {
-      await loadReviewList();
-    }
-  } finally {
-    reviewState.busyBillIds.delete(record.billId);
-    renderRowBusy(record.billId, false);
+```c
+cnaps_status_can_review(row.status)
+```
+
+不修改 `cnaps_status.h` 和 `validation_helper.c`。
+
+### 4.3 审计字段
+
+审核成功时必须写入：
+
+```text
+CHECKER_NO        = OPERATOR_NO
+CHECKER_TIME      = Oracle SYSTIMESTAMP
+LAST_ACTION       = REVIEW_PASS / REVIEW_RETURN
+LAST_OPERATOR_NO  = OPERATOR_NO
+LAST_REQUEST_ID   = REQ_ID
+LAST_ACTION_TIME  = Oracle SYSTIMESTAMP
+UPDATED_AT        = Oracle SYSTIMESTAMP
+VERSION_NO        = 原值 + 1
+```
+
+审核动作不写入 `REVIEW_COMMENT` 和 `REJECT_REASON`。已有字段保留在表中，但本 POC 不接收、不展示，也不依赖这些字段。
+
+## 5. HTTP 契约
+
+### 5.1 待审核列表
+
+请求：
+
+```http
+POST /api/cnaps/vouchers/review-list
+Content-Type: application/json
+
+{
+  "startWorkDate": "2026-07-01",
+  "endWorkDate": "2026-07-15",
+  "serialNo": "0002000",
+  "pageNo": 1,
+  "pageSize": 10
+}
+```
+
+允许空对象 `{}`。字段和校验规则完全复用通用查询，额外规则是服务端固定状态为 `10_PENDING_REVIEW`。
+
+响应复用现有分页结构：
+
+```json
+{
+  "respCode": "0000",
+  "respMsg": "查询成功",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 10,
+    "total": 1,
+    "records": []
   }
 }
 ```
 
-`4002` 或网络失败时只提示“结果可能未知，请刷新确认”，不自动调用同一个审核 POST；允许自动刷新只读列表。
+### 5.2 审核通过
 
-## 6. WebFE Servlet 设计
+```http
+POST /api/cnaps/vouchers/{billId}/review-pass
+```
 
-### 6.1 `CnapsVoucherServlet`
+请求 Body 为空，不接收目标状态和审核意见。
 
-修改路由判定：
+### 5.3 审核退回
+
+```http
+POST /api/cnaps/vouchers/{billId}/review-return
+```
+
+请求 Body 为空，不接收退回原因和审核意见。
+
+### 5.4 动作成功响应
+
+两个动作只返回：
+
+| FML32 字段 | JSON 字段 | 类型 |
+| --- | --- | --- |
+| `BILL_ID` | `billId` | string |
+| `STATUS` | `status` | string |
+| `CHECKER_NO` | `checkerNo` | string |
+| `CHECKER_TIME` | `checkerTime` | string |
+| `LAST_ACTION` | `lastAction` | string |
+| `VERSION_NO` | `versionNo` | number |
+
+完整凭证继续通过 `GET /api/cnaps/vouchers/{billId}` 查询。
+
+### 5.5 错误响应
+
+| 场景 | `respCode` | HTTP 状态 |
+| --- | --- | ---: |
+| 缺少 `billId` | `2001` | 400 |
+| 日期格式或范围错误 | `2002` | 400 |
+| 凭证不存在 | `3001` | 404 |
+| 当前状态不允许审核或发生并发冲突 | `3004` | 409 |
+| 数据库错误 | `4001` | 500 |
+
+`BaseJsonServlet.httpStatus` 已将 `3004` 映射为 HTTP 409，无需修改。
+
+## 6. 代码改动总览
+
+### 6.1 生产代码和部署配置
+
+| 序号 | 文件 | 改动 |
+| ---: | --- | --- |
+| 1 | `web-fe/src/main/java/com/ruisui/cnaps/web/servlet/CnapsVoucherServlet.java` | 开放三个 POST 路由，列表强制待审核状态 |
+| 2 | `web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/TuxedoRequestMapper.java` | 增加三个 HTTP 路由映射 |
+| 3 | `web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/MockTuxedoClient.java` | 模拟通过、退回和并发状态更新 |
+| 4 | `tuxedo-server/src/services/cnaps_review.c` | 新增两个审核服务，共用一个内部函数 |
+| 5 | `tuxedo-server/src/common/db_helper.c` | 审核动作使用 Oracle 时间写 `CHECKER_TIME` |
+| 6 | `tuxedo-server/src/cnapspocsvr.c` | 声明两个审核服务 |
+| 7 | `tuxedo-server/Makefile` | 注册两个审核服务 |
+| 8 | `tuxedo/UBBCONFIG` | 发布两个审核服务 |
+| 9 | `tuxedo/jolt/cnaps_services.bulk` | 增加两个动作服务 metadata |
+
+### 6.2 测试和运维文档
+
+| 文件 | 改动 |
+| --- | --- |
+| `web-fe/src/test/java/com/ruisui/cnaps/web/servlet/BaseJsonServletTest.java` | Servlet 路由、强制状态、空 Body 和 405 测试 |
+| `web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/TuxedoRequestMapperTest.java` | 三个路由映射测试 |
+| `web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/MockTuxedoClientV03ContractTest.java` | 审核状态、审计、失败和并发测试 |
+| `web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/TuxedoCSourceContractTest.java` | C 服务与 SQL 契约测试 |
+| `web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/DeploymentArtifactTest.java` | Makefile、UBB 和 metadata 注册测试 |
+| `scripts/smoke-test.sh` | 真实部署通过、退回和再次修改冒烟 |
+| `docs/cnaps-operations.md` | 补充审核 API 验证命令和预期结果 |
+
+测试可在现有测试类中追加，不需要为每个场景新建测试类。
+
+## 7. WebFE Servlet 设计
+
+文件：
+
+```text
+web-fe/src/main/java/com/ruisui/cnaps/web/servlet/CnapsVoucherServlet.java
+```
+
+### 7.1 删除统一禁用逻辑
+
+当前 `isRemovedReviewPath` 会让三个审核接口返回 405。实现时删除该判断，不能只修改 RequestMapper，否则请求到不了 Tuxedo。
+
+### 7.2 GET 仍然返回 405
+
+`isRejectedGetPath` 必须覆盖：
+
+```text
+/api/cnaps/vouchers
+/api/cnaps/vouchers/query
+/api/cnaps/vouchers/review-list
+以 /review-pass 结尾的路径
+以 /review-return 结尾的路径
+```
+
+这样可防止 `GET /{billId}/review-pass` 被详情路由误识别为 `CNAPS5702I`。
+
+建议逻辑：
+
+```java
+private static boolean isRejectedGetPath(String apiPath) {
+    return "/api/cnaps/vouchers".equals(apiPath)
+        || "/api/cnaps/vouchers/query".equals(apiPath)
+        || "/api/cnaps/vouchers/review-list".equals(apiPath)
+        || apiPath.endsWith("/review-pass")
+        || apiPath.endsWith("/review-return");
+}
+```
+
+### 7.3 列表路径识别
 
 ```java
 private static boolean isListPostPath(String apiPath) {
     return "/api/cnaps/vouchers/query".equals(apiPath)
         || "/api/cnaps/vouchers/review-list".equals(apiPath);
 }
+```
 
-private static boolean isRejectedGetPath(String apiPath) {
-    return "/api/cnaps/vouchers".equals(apiPath)
-        || "/api/cnaps/vouchers/query".equals(apiPath)
-        || "/api/cnaps/vouchers/review-list".equals(apiPath);
+两个列表共用 `validateListFilters`。列表路径不能调用 `includeBillPath`，避免把 `review-list` 解析为凭证号。
+
+### 7.4 强制状态
+
+在 JSON 解析和日期校验后、`callTuxedo` 前执行：
+
+```java
+if ("/api/cnaps/vouchers/review-list".equals(apiPath)) {
+    fields.put("status", "10_PENDING_REVIEW");
 }
 ```
 
-删除 `isRemovedReviewPath` 及 `doPost` 中的审核 405 分支。处理逻辑为：
+写入时机必须晚于请求 Body 解析，确保覆盖调用方伪造的 `status`。
 
-- `review-list`：解析 JSON Map，执行与通用列表相同的日期范围校验，不调用 `includeBillPath`。
-- `review-pass` / `review-return`：空 body 解析为空 Map，调用 `includeBillPath` 注入 `billId`。
-- 旧 `GET /api/cnaps/vouchers/review-list`：继续返回 HTTP 405。
+### 7.5 动作路径和空 Body
 
-日期校验继续复用 `RequestSupport.validateWorkDateFilter`，保证两个列表接口行为一致。
+两个动作属于非列表 POST，继续调用：
 
-### 6.2 错误映射
+```java
+RequestSupport.includeBillPath(fields, request.getPathInfo());
+```
 
-`BaseJsonServlet.httpStatus` 已满足当前审核错误码：
+当前 JSON 工具支持空 Body，不需要新增 DTO。最终 `billId` 来自 URL，不从 Body 获取。
 
-- `3001` -> 404。
-- `3003`、`3004` -> 409。
-- `4002` -> 504。
-- `4003` -> 503。
+## 8. HTTP 到 Tuxedo 映射设计
 
-无需新增 HTTP 状态映射。若审核服务出现未识别错误码，仍由默认分支返回 500。
+文件：
 
-## 7. Tuxedo 请求映射设计
+```text
+web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/TuxedoRequestMapper.java
+```
 
-### 7.1 `TuxedoRequestMapper.serviceName`
+### 8.1 路由顺序
 
-在通用查询判断之后、凭证详情通配判断之前增加：
+在通配路径 `cleanPath.startsWith("/api/cnaps/vouchers/")` 之前增加精确列表映射：
 
 ```java
 if ("POST".equals(verb) && "/api/cnaps/vouchers/review-list".equals(cleanPath)) {
-    return "CNAPS5702Q";
+    return "CNAPS4609Q";
 }
 ```
 
-在 `/api/cnaps/vouchers/` 子路径判断中增加：
+在凭证通配路径内部增加：
 
 ```java
 if ("POST".equals(verb) && cleanPath.endsWith("/review-pass")) {
@@ -349,629 +354,561 @@ if ("POST".equals(verb) && cleanPath.endsWith("/review-return")) {
 }
 ```
 
-审核动作判断必须与 `/delete` 同级；GET 详情判断必须排除集合路径，防止把 `review-list` 当成 `billId`。
-
-### 7.2 字段映射
-
-待审核列表使用现有 camelCase 自动转换或显式映射：
-
-| JSON | FML32 |
-| --- | --- |
-| `startWorkDate` | `START_WORK_DATE` |
-| `endWorkDate` | `END_WORK_DATE` |
-| `serialNo` | `SERIAL_NO` |
-| `pageNo` | `PAGE_NO` |
-| `pageSize` | `PAGE_SIZE` |
-
-审核动作只传：
-
-- 路径注入的 `BILL_ID`。
-- WebFE 生成的 `REQUEST_ID` / `REQ_ID`。
-- WebFE 配置的 `OPERATOR_NO`。
-- WebFE 配置的 `BRANCH_NO`。
-
-删除 `rejectReason`、`reviewComment`、`deleteReason` 的公开 body 映射，以与当前 API 文档的无请求体契约保持一致。内部 FML 常量可保留。
-
-## 8. Mock 客户端设计
-
-### 8.1 服务分派
-
-`MockTuxedoClient.call` 中：
-
-- 将 `CNAPS5702Q` 加入工作日期范围校验。
-- `CNAPS5702Q` 返回 `voucherPage(request, "10_PENDING_REVIEW")`。
-- `CNAPS5702A` 调用 `reviewPass`。
-- `CNAPS5702R` 调用 `reviewReturn`。
-
-### 8.2 状态变更
-
-两个动作共享私有方法，区别仅为目标状态、最后动作和消息：
+动作判断应在兜底详情判断之前。最终映射必须是：
 
 ```text
-CNAPS5702A -> 20_REVIEW_APPROVED / REVIEW_PASS
-CNAPS5702R -> 30_REVIEW_REJECTED / REVIEW_RETURN
+POST review-list   -> CNAPS4609Q
+POST review-pass   -> CNAPS5702A
+POST review-return -> CNAPS5702R
 ```
 
-共享流程：
+### 8.2 字段映射
 
-1. 按 `BILL_ID` 查找记录，不存在返回 `3001`。
-2. 对单张凭证对象加同步锁，保证 Mock 并发测试中状态检查和修改不可分割。
-3. 非 `10_PENDING_REVIEW` 返回 `3004`。
-4. 写入目标状态、审核员、审核时间、最后动作。
-5. 移除历史 `REVIEW_COMMENT` 和 `REJECT_REASON`。
-6. `VERSION_NO + 1`。
-7. 调用 `touch` 更新最后请求、操作员和时间。
-8. 返回更新后的凭证。
+本期不向 `BODY_FIELD_NAMES` 增加审核原因或意见。现有字段已覆盖：
 
-Mock 不得要求 `REJECT_REASON`，否则会与 HTTP API 和真实服务不一致。
+```text
+billId -> BILL_ID
+status -> STATUS
+pageNo -> PAGE_NO
+pageSize -> PAGE_SIZE
+```
 
-## 9. Jolt 客户端设计
+未知的驼峰查询字段仍由 `camelToFieldName` 转换。
 
-### 9.1 分页服务识别
+### 8.3 可信上下文
 
-修改 `JoltTuxedoClient`：
+`from` 方法保持最后写入：
+
+```text
+REQUEST_ID
+REQ_ID
+OPERATOR_NO
+BRANCH_NO
+```
+
+这样客户端即使构造同名 JSON 字段，也会被服务端配置覆盖。不修改该机制。
+
+## 9. Mock 实现设计
+
+文件：
+
+```text
+web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/MockTuxedoClient.java
+```
+
+### 9.1 服务分发
+
+在现有 `switch` 增加：
 
 ```java
-private static final List<String> PAGE_SERVICES =
-    List.of("BANKQRY", "CNAPS4609Q", "CNAPS5702Q");
-
-private static final List<String> OPERATOR_NO_OUTPUT_ONLY_SERVICES =
-    List.of("CNAPS4609Q", "CNAPS5702Q");
+case "CNAPS5702A" -> review(
+    request,
+    "20_REVIEW_APPROVED",
+    "REVIEW_PASS",
+    "审核通过成功"
+);
+case "CNAPS5702R" -> review(
+    request,
+    "30_REVIEW_REJECTED",
+    "REVIEW_RETURN",
+    "审核退回成功"
+);
 ```
 
-原因：
+不要增加 `CNAPS5702Q` 分支。待审核列表仍经过现有 `CNAPS4609Q`，Servlet 传入的 `STATUS` 会直接被 `voucherPage` 使用。
 
-- `CNAPS5702Q` 使用与通用查询相同的重复 FML occurrence 分页响应。
-- 审核列表中的 `OPERATOR_NO` 是输出记录字段，不是查询过滤条件；WebFE 不应向 Jolt 的输出字段写固定操作员号。
+### 9.2 公共审核方法
 
-### 9.2 响应读取
+新增一个公共内部方法，参数为请求、目标状态、动作名称和成功消息。伪代码：
 
-`readResponseFields` 现有分页分支可直接复用：
+```java
+private TuxedoResponse review(
+    TuxedoRequest request,
+    String targetStatus,
+    String lastAction,
+    String successMessage
+) {
+    String billId = text(request, "BILL_ID");
+    if (billId == null || billId.isBlank()) {
+        return TuxedoResponse.fail("2001", "billId is required");
+    }
 
-- `PAGE_NO`、`PAGE_SIZE`、`TOTAL_ELEMENTS` 映射到分页对象。
-- 以 `BILL_ID` 作为 occurrence 主字段。
-- 读取上限取 `min(pageSize, total, 1000)`。
-- WebFE 对外映射为 `pageNo`、`pageSize`、`total`、`records`。
+    synchronized (vouchers) {
+        Map<String, Object> voucher = vouchers.get(billId);
+        if (voucher == null) {
+            return TuxedoResponse.fail("3001", "单据不存在");
+        }
+        if (!"10_PENDING_REVIEW".equals(voucher.get("STATUS"))) {
+            return TuxedoResponse.fail("3004", "当前状态不允许审核");
+        }
 
-审核列表实际最大页大小由 C 服务限制为 100，因此不会触及 Jolt 的 1000 occurrence 安全上限。
+        voucher.put("STATUS", targetStatus);
+        voucher.put("CHECKER_NO", text(request, "OPERATOR_NO"));
+        voucher.put("CHECKER_TIME", now());
+        voucher.put("LAST_ACTION", lastAction);
+        voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
+        touch(voucher, request);
+        return ok(successMessage, actionResult(voucher));
+    }
+}
+```
+
+`touch` 继续负责 `LAST_OPERATOR_NO`、`LAST_REQUEST_ID`、`LAST_ACTION_TIME` 和 `UPDATED_AT`。同步范围必须包含状态检查和字段更新，防止通过与退回同时成功。
+
+### 9.3 动作摘要
+
+新增 `actionResult`，使用 `LinkedHashMap` 返回以下字段：
+
+```text
+BILL_ID
+STATUS
+CHECKER_NO
+CHECKER_TIME
+LAST_ACTION
+VERSION_NO
+```
+
+不要直接返回可变的完整 voucher Map，确保 Mock 与真实 C 服务响应结构一致。
+
+### 9.4 退回后修改
+
+现有 `update` 已执行：
+
+```text
+STATUS -> 10_PENDING_REVIEW
+移除 CHECKER_NO
+移除 CHECKER_TIME
+LAST_ACTION -> UPDATE
+VERSION_NO + 1
+```
+
+保留现有逻辑即可，不为审核功能复制修改服务。
 
 ## 10. Tuxedo C 服务设计
 
-### 10.1 待审核查询 `CNAPS5702Q`
+新增文件：
 
-在 `tuxedo-server/src/services/cnaps_query.c` 中恢复 `CNAPS5702Q`，并复用现有查询基础设施：
-
-输入：
-
-- `START_WORK_DATE`。
-- `END_WORK_DATE`。
-- `BRANCH_NO`，由 WebFE 注入。
-- `SERIAL_NO`。
-- `PAGE_NO`、`PAGE_SIZE`。
-
-固定参数：
-
-- `status = CNAPS_STATUS_PENDING_REVIEW`。
-- `voucher_no = ""`。
-- `payee_name = ""`。
-- `payee_account_no = ""`。
-- `include_deleted = 0`。
-
-处理规则：
-
-1. 用 513 字节临时缓冲读取原始日期，校验后再复制到 11 字节日期缓冲，避免截断后误判。
-2. 日期可只传一端；两端都传时开始日期不得晚于结束日期。
-3. `pageNo<=0` 使用 1。
-4. `pageSize<=0` 使用 10；大于 100 截断为 100。
-5. 调用现有 `db_query_vouchers`。
-6. 使用 1 MiB 响应缓冲。
-7. 输出 `PAGE_NO`、`PAGE_SIZE`、`TOTAL_ELEMENTS` 和重复凭证字段。
-
-为减少通用查询和审核查询重复，可在 `cnaps_query.c` 内提取日期/分页解析私有函数；不得改变现有 `CNAPS4609Q` 的过滤语义。
-
-### 10.2 审核服务源文件
-
-新增 `tuxedo-server/src/services/cnaps_review.c`，导出：
-
-```c
-void CNAPS5702A(TPSVCINFO *rqst);
-void CNAPS5702R(TPSVCINFO *rqst);
+```text
+tuxedo-server/src/services/cnaps_review.c
 ```
 
-共享函数建议签名：
+### 10.1 头文件
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include "cnaps_db.h"
+#include "cnaps_fields.h"
+#include "cnaps_service.h"
+#include "cnaps_status.h"
+```
+
+### 10.2 公共函数
+
+文件内只实现一个公共状态变更函数，例如：
 
 ```c
 static void review_voucher(
     TPSVCINFO *rqst,
     const char *service_name,
     const char *target_status,
-    const char *action,
+    const char *last_action,
     const char *success_message
-);
+)
 ```
 
-本次不再保留 `reject_required` 参数，也不读取 `REJECT_REASON` 或 `REVIEW_COMMENT`。
+`CNAPS5702A` 和 `CNAPS5702R` 只负责传入不同参数，不能复制两份数据库逻辑。
 
-### 10.3 审核服务算法
+### 10.3 处理顺序
 
-```text
-读取 BILL_ID
-  为空 -> 2001
-按 BILL_ID 查询凭证
-  不存在 -> 3001
-  DB 失败 -> 4001
-检查 cnaps_status_can_review(row.status)
-  否 -> 3004
-读取 OPERATOR_NO、REQ_ID
-设置 target status、action、checkerNo、lastOperatorNo、lastRequestId
-清空 checkerTime（由数据库写 SYSTIMESTAMP）
-清空 reviewComment、rejectReason
-开启事务
-按 BILL_ID + VERSION_NO 乐观更新
-  影响 0 行 -> rollback -> 3004
-  DB 失败 -> rollback -> 4001
-重新查询更新后记录
-提交
-输出凭证与 0000
+公共函数严格按以下顺序处理：
+
+1. 将 `rqst->data` 转为 `FBFR32 *`。
+2. 记录 `cnaps_log_service_start(service_name)`。
+3. 读取 `BILL_ID`；为空返回 `2001`。
+4. 调用 `db_find_voucher`。
+5. 未找到返回 `3001`，其他查询错误返回 `4001`。
+6. 调用 `cnaps_status_can_review(row.status)`；不允许时返回 `3004`。
+7. 从 FML32 读取 `OPERATOR_NO` 和 `REQ_ID`。
+8. 设置目标状态、审核人、最后动作、最后操作人和请求号。
+9. 调用 `db_begin()`。
+10. 调用 `db_update_voucher(&row)`。
+11. 更新 0 行时回滚并返回 `3004`。
+12. 其他更新错误时回滚并返回 `4001`。
+13. 调用 `db_find_voucher` 重新读取数据库生成的时间和新版本。
+14. 调用 `db_commit()`；失败则回滚并返回 `4001`。
+15. 写入六个动作摘要字段。
+16. 调用 `cnaps_return_response(rqst, 1, "0000", success_message)`。
+
+### 10.4 行对象赋值
+
+```c
+snprintf(row.status, sizeof(row.status), "%s", target_status);
+snprintf(row.checker_no, sizeof(row.checker_no), "%s", operator_no);
+snprintf(row.last_action, sizeof(row.last_action), "%s", last_action);
+snprintf(row.last_operator_no, sizeof(row.last_operator_no), "%s", operator_no);
+snprintf(row.last_request_id, sizeof(row.last_request_id), "%s", request_id);
 ```
 
-审核状态冲突统一返回 `3004`，不返回 `3003`。`3003` 继续用于修改、删除等一般状态不允许场景。
+不要由 C 进程计算 `checker_time`；数据库 SQL 根据审核动作写入 `SYSTIMESTAMP`。
 
-### 10.4 审核时间
+### 10.5 乐观锁结果
 
-当前 `db_update_voucher` 的 `CHECKER_TIME` 逻辑只会把空值写为 NULL。审核服务若将 `checker_time` 留空，将导致审核成功却没有审核时间。必须恢复动作感知逻辑：
+`db_update_voucher` 使用读取到的 `row.version_no` 作为更新条件：
 
 ```sql
-CHECKER_TIME = CASE
+WHERE BILL_ID=:bill_id
+  AND NVL(VERSION_NO, 1)=:version_no
+```
+
+两个请求同时读取同一版本时，只能有一个更新成功。第二个更新影响 0 行，必须映射为 `3004`，不能映射为 `3001`。
+
+### 10.6 响应字段写入
+
+不要调用 `cnaps_put_voucher` 返回完整凭证，改用现有 helper：
+
+```c
+cnaps_put_string(fbfr, CNAPS_F_BILL_ID, row.bill_id);
+cnaps_put_string(fbfr, CNAPS_F_STATUS, row.status);
+cnaps_put_string(fbfr, CNAPS_F_CHECKER_NO, row.checker_no);
+cnaps_put_string(fbfr, CNAPS_F_CHECKER_TIME, row.checker_time);
+cnaps_put_string(fbfr, CNAPS_F_LAST_ACTION, row.last_action);
+cnaps_put_long(fbfr, CNAPS_F_VERSION_NO, row.version_no);
+```
+
+### 10.7 两个导出函数
+
+```c
+void CNAPS5702A(TPSVCINFO *rqst)
+{
+    review_voucher(
+        rqst,
+        "CNAPS5702A",
+        CNAPS_STATUS_APPROVED,
+        "REVIEW_PASS",
+        "审核通过成功"
+    );
+}
+
+void CNAPS5702R(TPSVCINFO *rqst)
+{
+    review_voucher(
+        rqst,
+        "CNAPS5702R",
+        CNAPS_STATUS_REJECTED,
+        "REVIEW_RETURN",
+        "审核退回成功"
+    );
+}
+```
+
+状态宏名称以现有 `cnaps_status.h` 为准；实现前先确认实际宏名，不得另建重复常量。
+
+## 11. 数据库更新时间设计
+
+文件：
+
+```text
+tuxedo-server/src/common/db_helper.c
+```
+
+在 `db_update_voucher` 的 SQL 中，将现有 `CHECKER_TIME` 表达式改为：
+
+```sql
+CHECKER_TIME=CASE
   WHEN :last_action IN ('REVIEW_PASS', 'REVIEW_RETURN') THEN SYSTIMESTAMP
   WHEN :checker_time IS NULL THEN NULL
   ELSE TO_TIMESTAMP(:checker_time, 'YYYY-MM-DD HH24:MI:SS')
 END
 ```
 
-这样审核时间使用 Oracle 服务器时间，与 `UPDATED_AT` 和 `LAST_ACTION_TIME` 同一时间源。修改退回凭证时现有逻辑会清空 `checker_time`，对应数据库写 NULL。
+作用：
 
-### 10.5 乐观并发
+- 审核动作由 Oracle 生成审核时间。
+- 退回凭证再次修改时，现有更新逻辑仍可把审核时间清空。
+- 其他已有操作保持原行为。
 
-`db_update_voucher` 当前更新条件为：
+`UPDATED_AT`、`LAST_ACTION_TIME` 和 `VERSION_NO` 的现有 SQL 已满足要求，不修改。
 
-```sql
-WHERE BILL_ID = :bill_id
-  AND NVL(VERSION_NO, 1) = :version_no
+## 12. 服务注册设计
+
+### 12.1 C 服务声明
+
+文件 `tuxedo-server/src/cnapspocsvr.c` 增加：
+
+```c
+void CNAPS5702A(TPSVCINFO *rqst);
+void CNAPS5702R(TPSVCINFO *rqst);
 ```
 
-两个审核请求读取相同版本时，只有第一个更新成功；第二个更新影响 0 行并返回 `3004`。所有应用状态变更必须继续递增 `VERSION_NO`，不得绕过该函数直接更新状态而不增版本。
+不要声明 `CNAPS5702Q`。
 
-## 11. 服务注册与元数据设计
+### 12.2 Makefile
 
-### 11.1 C 主程序和构建
-
-修改 `tuxedo-server/src/cnapspocsvr.c`，增加三个服务声明。修改 `tuxedo-server/Makefile`：
-
-```make
-SERVICES := ... CNAPS4609Q CNAPS5702Q CNAPS5702I CNAPS5702A CNAPS5702R
-```
-
-`SOURCES` 已使用 `$(wildcard src/services/*.c)`，新增 `cnaps_review.c` 会自动参与编译，无需单独列源文件。
-
-### 11.2 UBBCONFIG
-
-在 `tuxedo/UBBCONFIG` 的 `*SERVICES` 增加：
+文件 `tuxedo-server/Makefile` 的 `SERVICES` 末尾增加：
 
 ```text
-CNAPS5702Q
+CNAPS5702A CNAPS5702R
+```
+
+`SOURCES` 已使用 `$(wildcard src/services/*.c)`，新增 `cnaps_review.c` 会自动参与编译，不需要额外添加源文件行。
+
+### 12.3 UBBCONFIG
+
+文件 `tuxedo/UBBCONFIG` 的 `*SERVICES` 增加：
+
+```text
 CNAPS5702A
 CNAPS5702R
 ```
 
-无需增加新 server process，三个服务由现有 `cnapspocsvr` 提供。
+不要增加 `CNAPS5702Q`。
 
-### 11.3 Jolt metadata
+## 13. Jolt metadata 设计
 
-在 `tuxedo/jolt/cnaps_services.bulk` 增加三个 `service=` 块。
-
-`CNAPS5702Q`：
-
-- 输入：日期范围、机构号、流水号、分页参数。
-- 输出：分页元数据和列表记录字段。
-- 列表字段使用 `count=0` 表示重复 occurrence。
-- `PAYER_ADDRESS`、`PAYEE_ADDRESS`、`PAYER_BANK_NAME` 仍为详情专用字段，不加入列表。
-
-`CNAPS5702A` / `CNAPS5702R`：
-
-- 输入：`REQUEST_ID`、`REQ_ID`、`BILL_ID`、`BRANCH_NO`、`OPERATOR_NO`。
-- 输出：`RESP_CODE`、`RESP_MSG` 以及当前 API 允许的凭证结果字段。
-- 不定义 `REVIEW_COMMENT` 或 `REJECT_REASON` 为输入。
-- `RESP_CODE`、`RESP_MSG` 必须使用 `outerr`，保证 TPFAIL 时 Jolt 仍可读取业务错误。
-
-`scripts/load-jolt-metadata.sh` 当前在加载前执行：
+文件：
 
 ```text
-tmloadrepos -d CNAPS5702Q,CNAPS5702A,CNAPS5702R ...
+tuxedo/jolt/cnaps_services.bulk
 ```
 
-该删除步骤可以保留，作用是先清理可能存在的旧定义，再由随后生成的完整 metadata 重新加载新定义。测试应从“永久清除已退役服务”调整为“删除旧定义后重新加载当前定义”。
+只增加 `CNAPS5702A` 和 `CNAPS5702R` 两个 service 块。两个块字段完全相同，只有服务名不同。
 
-## 12. 数据库与数据设计
+| 参数 | 类型 | access | 说明 |
+| --- | --- | --- | --- |
+| `REQUEST_ID` | string | in | WebFE 请求号 |
+| `REQ_ID` | string | in | C 服务审计请求号 |
+| `OPERATOR_NO` | string | in | 审核员 |
+| `BRANCH_NO` | string | in | WebFE 可信机构上下文 |
+| `BILL_ID` | string | inout | 路径凭证号及响应凭证号 |
+| `STATUS` | string | out | 目标状态 |
+| `CHECKER_NO` | string | out | 审核员 |
+| `CHECKER_TIME` | string | out | 审核时间 |
+| `LAST_ACTION` | string | out | 审核动作 |
+| `VERSION_NO` | long | out | 新版本号 |
+| `RESP_CODE` | string | outerr | 业务响应码 |
+| `RESP_MSG` | string | outerr | 业务响应消息 |
 
-### 12.1 表结构
-
-不新增表或列，继续使用 `T_CNAPS_BILL_POC`：
-
-| 字段 | 审核用途 |
-| --- | --- |
-| `STATUS` | 当前凭证状态 |
-| `CHECKER_NO` | 最近审核操作员 |
-| `CHECKER_TIME` | 最近审核时间 |
-| `LAST_ACTION` | `REVIEW_PASS` 或 `REVIEW_RETURN` |
-| `LAST_OPERATOR_NO` | 最后操作员 |
-| `LAST_REQUEST_ID` | WebFE 生成的请求流水 |
-| `LAST_ACTION_TIME` | 最后动作时间 |
-| `UPDATED_AT` | 最后更新时间 |
-| `VERSION_NO` | 乐观锁版本 |
-
-### 12.2 字段写入矩阵
-
-| 动作 | STATUS | CHECKER_NO/TIME | LAST_ACTION | VERSION_NO |
-| --- | --- | --- | --- | --- |
-| 创建 | `10_PENDING_REVIEW` | 空 | `CREATE` | 1 |
-| 审核通过 | `20_REVIEW_APPROVED` | 写入 | `REVIEW_PASS` | +1 |
-| 审核退回 | `30_REVIEW_REJECTED` | 写入 | `REVIEW_RETURN` | +1 |
-| 退回后修改 | `10_PENDING_REVIEW` | 清空 | `UPDATE` | +1 |
-| 删除 | `40_DELETED` | 保持现有语义 | `DELETE` | +1 |
-
-### 12.3 历史状态迁移
-
-本功能本身不新增迁移文件。上线前使用现有：
+每个 service 块头部：
 
 ```text
-scripts/migrate-voucher-review.sh
-sql/050_enable_voucher_review.sql
+service=CNAPS5702A
+export=true
+inbuf=FML32
+outbuf=FML32
 ```
 
-迁移脚本幂等地将 `00_DRAFT` 改为 `10_PENDING_REVIEW`。首次发布该状态体系时必须在停机维护窗口执行；已经完成迁移的环境不需要重复停机迁移，但可通过只读 SQL 先确认：
+另一个块将服务名改为 `CNAPS5702R`。不要把完整凭证字段复制到动作服务 metadata，不要增加 reason/comment 字段。
 
-```sql
-SELECT STATUS, COUNT(*)
-FROM T_CNAPS_BILL_POC
-GROUP BY STATUS
-ORDER BY STATUS;
-```
-
-不得在文档、脚本输出或提交中暴露 `conf/db.env` 内容。
-
-## 13. 返回与错误设计
-
-### 13.1 成功返回
-
-保持统一 envelope：
-
-```json
-{
-  "respCode": "0000",
-  "respMsg": "审核通过成功",
-  "data": {
-    "billId": "B202607157720002000",
-    "status": "20_REVIEW_APPROVED",
-    "checkerNo": "77210021",
-    "checkerTime": "2026-07-15 10:30:00",
-    "lastAction": "REVIEW_PASS",
-    "versionNo": 2
-  }
-}
-```
-
-页面只强依赖 `respCode` 和刷新后的服务端数据。动作响应中的 `data` 可包含更多当前 API 公开字段，但不得要求前端从动作响应本地拼装最终列表。
-
-### 13.2 错误返回
-
-| C 服务场景 | respCode | WebFE HTTP |
-| --- | --- | --- |
-| 缺少 `billId` | `2001` | 400 |
-| 凭证不存在 | `3001` | 404 |
-| 非待审核或乐观锁失败 | `3004` | 409 |
-| 数据库失败 | `4001` | 500 |
-| Jolt/Tuxedo 超时 | `4002` | 504 |
-| Tuxedo 不可用 | `4003` | 503 |
-
-错误返回的 `data` 必须为 `null`。前端优先显示 `respMsg`，但应为无消息或非 JSON 响应提供本地兜底文案。
+现有 `scripts/load-jolt-metadata.sh` 已在加载前删除 `CNAPS5702Q,CNAPS5702A,CNAPS5702R` 的旧定义。删除不存在的 `CNAPS5702Q` 不影响加载，因此脚本无需修改。
 
 ## 14. 测试设计
 
-### 14.1 WebFE 路由测试
+### 14.1 Servlet 测试
 
-修改 `BaseJsonServletTest`：
+在 `BaseJsonServletTest` 调整原“审核接口全部 405”的断言，并增加：
 
-- `doesNotDefaultDateFilterForVoucherCollections` 同时覆盖 `query` 和 `review-list`。
-- 日期范围转发、空白范围清理、非法日期和退役 `workDate` 校验同时覆盖两个 POST 列表。
-- GET 405 测试继续覆盖 `review-list`。
-- 删除“审核 POST 被移除”的断言。
-- 新增审核通过/退回空 body 能调用 Tuxedo、正确注入 `BILL_ID`、`OPERATOR_NO`、`BRANCH_NO`、`REQ_ID` 的测试。
+1. `POST /review-list` 调用 Tuxedo。
+2. `{}` 请求会生成 `STATUS=10_PENDING_REVIEW`。
+3. Body 传 `status=20_REVIEW_APPROVED` 时仍被覆盖为待审核。
+4. `review-list` 不把路径文本写入 `BILL_ID`。
+5. `POST /{billId}/review-pass` 空 Body 可用，服务名为 `CNAPS5702A`。
+6. `POST /{billId}/review-return` 空 Body 可用，服务名为 `CNAPS5702R`。
+7. 两个动作均正确写入路径 `BILL_ID`。
+8. 三个审核路径使用 GET 时返回 405，且不调用 Tuxedo。
+9. `review-list` 的日期格式和倒序范围仍返回 `2002`。
 
-### 14.2 请求映射测试
+### 14.2 RequestMapper 测试
 
-修改 `TuxedoRequestMapperTest`：
+在 `TuxedoRequestMapperTest` 将当前“不支持审核路径”的断言改为：
 
-- `review-list -> CNAPS5702Q`。
-- `review-pass -> CNAPS5702A`。
-- `review-return -> CNAPS5702R`。
-- GET 列表仍被拒绝。
-- 审核请求不产生 `REJECT_REASON`、`REVIEW_COMMENT`、客户端操作员或客户端机构字段。
+```java
+assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/review-list"))
+    .isEqualTo("CNAPS4609Q");
+assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/BILL-1/review-pass"))
+    .isEqualTo("CNAPS5702A");
+assertThat(mapper.serviceName("POST", "/api/cnaps/vouchers/BILL-1/review-return"))
+    .isEqualTo("CNAPS5702R");
+```
+
+保留不支持的 HTTP 方法和未知路径测试。
 
 ### 14.3 Mock 契约测试
 
-修改 `MockTuxedoClientV03ContractTest` 并增加：
+在现有 Mock 契约测试中覆盖：
 
-1. 审核列表只返回待审核记录。
-2. 审核列表日期范围、流水号和分页正确。
-3. 审核通过完整审计字段和版本号正确。
-4. 审核退回不要求原因并正确改变状态。
-5. 非待审核状态返回 `3004`。
-6. 不存在记录返回 `3001`。
-7. 退回后修改重新进入待审核并清空审核字段。
-8. 同一操作员可创建并审核同一凭证，符合 POC 限制。
-9. 两线程并发通过/退回时只有一个 `0000`，另一个 `3004`。
+| 场景 | 预期 |
+| --- | --- |
+| 创建后用 `CNAPS4609Q + STATUS=10_PENDING_REVIEW` 查询 | 列表包含新凭证 |
+| 审核通过 | 状态为 `20_REVIEW_APPROVED`，动作和审核字段正确，版本加 1 |
+| 审核退回 | 状态为 `30_REVIEW_REJECTED`，动作和审核字段正确，版本加 1 |
+| 动作成功响应 | 只包含六个摘要字段 |
+| 不存在的凭证 | `3001` |
+| 已通过凭证再次审核 | `3004` |
+| 已退回凭证再次审核 | `3004` |
+| 退回后修改 | 状态回到待审核，审核人和时间清空 |
+| 同一凭证并发通过和退回 | 一个 `0000`、一个 `3004`，版本只增加一次 |
 
-### 14.4 Jolt 客户端测试
+并发测试可使用两个线程和同一起跑门闩，不需要压力测试框架。
 
-修改 `JoltTuxedoClientTest` 和测试桩 `bea.jolt.JoltRemoteService`：
+### 14.4 C 源码契约测试
 
-- `CNAPS5702Q` 被按分页服务解析。
-- repeated fields 正确映射为 `records`。
-- 查询请求不向 output-only 的 `OPERATOR_NO` 写值。
-- `CNAPS5702A/R` 成功和 TPFAIL 错误 envelope 可读取。
-- `VERSION_NO` 仍按数值读取。
+更新 `TuxedoCSourceContractTest`：
 
-### 14.5 原生 C 与部署制品契约测试
+- 原先断言 `cnaps_review.c` 不存在，改为断言存在。
+- 文件包含 `CNAPS5702A`、`CNAPS5702R`、`cnaps_status_can_review`。
+- 文件包含错误码 `2001`、`3001`、`3004`、`4001`。
+- 文件调用 `db_begin`、`db_update_voucher`、`db_commit` 和 `db_rollback`。
+- 文件只输出六个摘要字段。
+- 文件不包含 `CNAPS5702Q`、`REVIEW_COMMENT` 或 `REJECT_REASON`。
+- `db_helper.c` 包含审核动作对应的 `SYSTIMESTAMP` 表达式。
 
-修改 `TuxedoCSourceContractTest`：
+### 14.5 部署制品测试
 
-- `cnaps_review.c` 存在并导出两个动作。
-- 使用 `cnaps_status_can_review`、`3004`、乐观更新和事务回滚。
-- 不包含退回原因必填逻辑和 `3005` 本人审核限制。
-- `db_helper.c` 审核动作将 `CHECKER_TIME` 写为 `SYSTIMESTAMP`。
-- `CNAPS5702Q` 固定使用 `CNAPS_STATUS_PENDING_REVIEW`。
+更新 `DeploymentArtifactTest`：
 
-修改 `DeploymentArtifactTest`：
+- `cnapspocsvr.c` 声明 A/R。
+- Makefile 的服务列表包含 A/R。
+- UBBCONFIG 发布 A/R。
+- 三处都不要求 `CNAPS5702Q`。
+- metadata 只新增 A/R 块。
+- A/R metadata 包含六个输出字段和 `RESP_CODE/RESP_MSG`。
+- A/R metadata 不包含 reason/comment 字段。
+- 现有 `CNAPS4609Q` metadata 保持不变。
 
-- `EXPORTED_SERVICES` 加入 `CNAPS5702Q/A/R`。
-- Makefile、主 C 文件、UBBCONFIG 和 Jolt metadata 都包含三个服务。
-- 审核列表的日期范围、分页、重复字段方向正确。
-- 审核动作的 `BILL_ID`、上下文字段和 envelope 方向正确。
-- 审核动作 metadata 不把原因/意见定义为输入。
-- 更新 `load-jolt-metadata.sh` 断言，允许先删除旧定义再加载当前定义。
-
-### 14.6 前端手工测试
-
-当前项目没有浏览器测试框架。本期至少执行：
-
-- 页面首次加载、查询、重置、翻页、空数据。
-- 查看详情打开和关闭。
-- 通过和退回的确认/取消。
-- 双击按钮只能发出一次请求。
-- `3004` 并发提示和刷新。
-- 长文本、中文、HTML 特殊字符不破坏页面。
-- 1280px 桌面和窄屏水平滚动。
-- 键盘 Tab、Enter、Escape 基本操作。
+不需要修改 `JoltTuxedoClientTest` 的分页服务集合，因为审核列表复用已存在的 `CNAPS4609Q`。如现有测试桩对未知动作服务报错，只补充 A/R 的最小通用动作响应，不增加新的分页读取逻辑。
 
 ## 15. 冒烟测试设计
 
-扩展 `scripts/smoke-test.sh`，不要只检查 HTTP 连接成功，还要检查 `respCode` 和最终状态。
-
-建议流程：
+文件：
 
 ```text
-健康检查
-创建凭证 A -> 10_PENDING_REVIEW
-待审核列表能查到 A
-审核通过 A -> 20_REVIEW_APPROVED
-通用查询按 billId/状态或详情确认 A
-
-创建凭证 B -> 10_PENDING_REVIEW
-审核退回 B -> 30_REVIEW_REJECTED
-详情确认 B
-修改 B -> 10_PENDING_REVIEW
-再次审核通过 B -> 20_REVIEW_APPROVED
-
-创建凭证 C -> 删除 -> 40_DELETED
+scripts/smoke-test.sh
 ```
 
-当前通用查询没有 `billId` 过滤条件，因此最终单据确认优先调用详情接口；列表状态校验可结合 `serialNo` 或创建响应中的字段。
+保留现有健康检查和基础 CRUD，追加两个相互独立的凭证流程。
 
-审核 curl 示例：
+### 15.1 审核通过流程
+
+1. 创建凭证 A。
+2. 调用 `review-list`，断言包含 A 且状态为待审核。
+3. 空 Body 调用 A 的 `review-pass`。
+4. 断言响应为 `0000`、状态为 `20_REVIEW_APPROVED`、版本为 2。
+5. 再次调用 `review-pass`，断言 `3004`。
+
+### 15.2 审核退回流程
+
+1. 创建凭证 B。
+2. 空 Body 调用 B 的 `review-return`。
+3. 断言状态为 `30_REVIEW_REJECTED`。
+4. 调用现有修改接口修改 B。
+5. 断言状态回到 `10_PENDING_REVIEW`，版本继续增加。
+6. 再次查询 `review-list`，断言包含 B。
+
+动作请求不要传 `{}`、`reason` 或 `comment`；使用无 Body 的 POST，验证真实 API 契约。
+
+## 16. 实现顺序
+
+OpenCode 按以下顺序执行，可减少重复修改：
+
+1. 阅读 API、需求、设计文档和当前相关源码。
+2. 修改 Servlet 与 RequestMapper，先打通三个 HTTP 路由。
+3. 修改 Mock 并完成 Java 主流程测试。
+4. 新增 `cnaps_review.c` 和数据库时间 SQL。
+5. 注册 C 服务、UBB 和 Jolt metadata。
+6. 补充源码契约和部署制品测试。
+7. 更新冒烟脚本与运维文档。
+8. 运行完整 Maven 构建。
+9. 在 Linux/Tuxedo 环境编译 C、部署并运行冒烟。
+
+不要先批量恢复历史文件；每完成一层就运行对应测试。
+
+## 17. 验证命令
+
+### 17.1 本地 Java 测试
 
 ```bash
-curl -fsS -X POST "$BASE_URL/api/cnaps/vouchers/$bill_id/review-pass"
-curl -fsS -X POST "$BASE_URL/api/cnaps/vouchers/$bill_id/review-return"
-```
-
-不要为无 body 请求添加虚构 JSON。脚本必须在响应不包含 `"respCode":"0000"` 或预期状态时退出非零。
-
-## 16. 实施顺序
-
-按以下顺序开发可以尽早发现契约和部署问题：
-
-1. 更新测试期望，先增加请求映射、Mock 生命周期和 Servlet 路由测试。
-2. 恢复 `TuxedoRequestMapper`、Servlet 和 Mock 服务，使 Maven 测试中的 HTTP/Mock 链路通过。
-3. 恢复 `JoltTuxedoClient` 分页识别和 Jolt 测试。
-4. 实现 `CNAPS5702Q` 和 `cnaps_review.c`，恢复审核时间数据库逻辑。
-5. 更新 Makefile、主程序、UBBCONFIG 和 Jolt metadata。
-6. 更新部署制品和 C 源码契约测试，运行完整 Maven 测试。
-7. 实现审核 JSP、结构化查询列表、JavaScript 和 CSS。
-8. 扩展冒烟脚本和运维说明。
-9. 在 Linux/Tuxedo 环境执行 C 编译、metadata/TUXCONFIG 加载、WAR 构建和完整部署。
-10. 执行真实 Jolt 模式端到端验收。
-
-每一步都保持当前分支可编译；不要先提交只包含页面、但后端仍返回 405 的中间发布版本。
-
-## 17. 变更文件清单
-
-### 17.1 必须新增
-
-```text
-web-fe/src/main/webapp/cnaps-review.jsp
-tuxedo-server/src/services/cnaps_review.c
-```
-
-### 17.2 必须修改
-
-```text
-web-fe/src/main/webapp/index.jsp
-web-fe/src/main/webapp/cnaps-create.jsp
-web-fe/src/main/webapp/cnaps-query.jsp
-web-fe/src/main/webapp/static/js/cnaps.js
-web-fe/src/main/webapp/static/css/app.css
-
-web-fe/src/main/java/com/ruisui/cnaps/web/servlet/CnapsVoucherServlet.java
-web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/TuxedoRequestMapper.java
-web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/MockTuxedoClient.java
-web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/JoltTuxedoClient.java
-web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/TuxedoResponseMapper.java
-
-tuxedo-server/Makefile
-tuxedo-server/src/cnapspocsvr.c
-tuxedo-server/src/services/cnaps_query.c
-tuxedo-server/src/common/db_helper.c
-tuxedo/UBBCONFIG
-tuxedo/jolt/cnaps_services.bulk
-
-scripts/smoke-test.sh
-docs/cnaps-operations.md
-```
-
-### 17.3 必须更新的测试
-
-```text
-web-fe/src/test/java/com/ruisui/cnaps/web/servlet/BaseJsonServletTest.java
-web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/TuxedoRequestMapperTest.java
-web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/MockTuxedoClientV03ContractTest.java
-web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/JoltTuxedoClientTest.java
-web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/TuxedoCSourceContractTest.java
-web-fe/src/test/java/com/ruisui/cnaps/web/tuxedo/DeploymentArtifactTest.java
-web-fe/src/test/java/bea/jolt/JoltRemoteService.java
-```
-
-`tuxedo-server/include/cnaps_status.h` 和 `validation_helper.c` 已具备审核状态帮助函数，预计无需功能修改，但应由测试确认其实现未被移除。
-
-## 18. 编译与验证
-
-### 18.1 Windows/开发机可执行验证
-
-```powershell
+mvn -f web-fe/pom.xml -Dtest=BaseJsonServletTest,TuxedoRequestMapperTest,MockTuxedoClientV03ContractTest,TuxedoCSourceContractTest,DeploymentArtifactTest test
 mvn -f web-fe/pom.xml clean package
 ```
 
-预期：
+验收：
 
-- 所有 JUnit 测试通过。
-- 生成 `web-fe/target/ruisui-bank-sim.war`。
-- WAR 中包含 `cnaps-review.jsp`、更新后的 JavaScript 和 CSS。
+- 测试全部通过。
+- 生成 WAR。
+- 无编译错误和新增告警。
 
-### 18.2 Linux/Tuxedo 环境验证
+### 17.2 Linux C 编译和部署
 
-```bash
-./scripts/preflight.sh
-./scripts/build-c.sh
-./scripts/load-jolt-metadata.sh
-./scripts/load-tuxconfig.sh
-./scripts/build-web.sh
-```
-
-预期：
-
-- `tuxedo-server/bin/cnapspocsvr` 链接成功。
-- metadata repository 中存在 `CNAPS5702Q/A/R`。
-- TUXCONFIG 加载成功。
-- Maven 测试通过并生成 WAR。
-
-### 18.3 完整部署
-
-已完成历史状态迁移的环境：
+在配置好 Tuxedo、Oracle Client 和环境变量的 Linux 虚拟机执行项目现有脚本：
 
 ```bash
-cd /home/tian/cnaps-single-table-poc
 ./scripts/rebuild-deploy.sh
 ./scripts/cnapsctl.sh status
 BASE_URL=http://127.0.0.1:8080/ruisui-bank-sim ./scripts/smoke-test.sh
 ```
 
-首次淘汰 `00_DRAFT` 的环境：
+若项目脚本实际入口有变化，以 `docs/cnaps-operations.md` 的当前命令为准，不另写一套部署脚本。
 
-```bash
-cd /home/tian/cnaps-single-table-poc
-./scripts/down.sh
-sh ./scripts/migrate-voucher-review.sh
-./scripts/rebuild-deploy.sh
-./scripts/cnapsctl.sh status
-BASE_URL=http://127.0.0.1:8080/ruisui-bank-sim ./scripts/smoke-test.sh
+### 17.3 服务注册检查
+
+部署后确认：
+
+```text
+CNAPS5702A 可调用
+CNAPS5702R 可调用
+CNAPS4609Q 继续可调用
+Jolt metadata 加载无错误
+SYSHEALTH 返回 WebFE/Tuxedo/Oracle 全部 UP
 ```
 
-`rebuild-deploy` 的顺序应继续是：预检、停止服务、编译 C、加载 Jolt metadata、加载 TUXCONFIG、构建 WAR、部署 WAR、启动全链路、健康检查。
+## 18. OpenCode 完成检查表
 
-### 18.4 部署后检查
+- [ ] 三个 POST API 均可访问。
+- [ ] 三个审核路径使用 GET 均返回 405。
+- [ ] `review-list` 映射到现有 `CNAPS4609Q`。
+- [ ] 调用方传入的状态会被覆盖为待审核。
+- [ ] 没有新增 `CNAPS5702Q`。
+- [ ] 只新增 `CNAPS5702A` 和 `CNAPS5702R` 两个 Tuxedo 服务。
+- [ ] 动作 API 无请求 Body。
+- [ ] 动作响应只有六个必要字段。
+- [ ] 审核人来自 WebFE 可信配置。
+- [ ] 审核时间来自 Oracle `SYSTIMESTAMP`。
+- [ ] 非待审核状态返回 `3004`。
+- [ ] 并发审核只有一个成功。
+- [ ] 退回后修改重新进入待审核。
+- [ ] Mock 与真实服务主流程一致。
+- [ ] Maven 测试和 WAR 打包成功。
+- [ ] Tuxedo C 编译和注册成功。
+- [ ] Jolt metadata 加载成功。
+- [ ] 冒烟测试通过。
+- [ ] 未修改任何 JSP、JavaScript 或 CSS。
 
-```bash
-./scripts/status-tuxedo.sh
-curl -fsS http://127.0.0.1:8080/ruisui-bank-sim/api/health
-```
+## 19. 工作量评估
 
-必须确认：
+按本设计实现，预计：
 
-- Tuxedo 服务列表包含 `CNAPS5702Q`、`CNAPS5702A`、`CNAPS5702R`。
-- 健康响应中 `oracle`、`tuxedo`、`webfe` 全部为 `UP`。
-- 审核页可打开且静态资源无 404。
-- 浏览器网络面板中审核动作请求路径包含正确上下文路径，无多余请求 body。
+| 类别 | 数量或代码量 |
+| --- | ---: |
+| 生产代码和部署配置文件 | 约 9 个 |
+| 测试文件 | 约 5 个 |
+| 脚本和运维文档 | 约 2 个 |
+| 生产代码及配置新增/修改 | 约 300～500 行 |
+| 测试、脚本和文档新增/修改 | 约 200～300 行 |
+| 总改动 | 约 500～800 行 |
+| 开发、联调和部署 | 约 2～4 人日 |
 
-## 19. 发布与回滚
+行数包含 Tuxedo/Jolt 注册、测试和冒烟脚本，不代表业务逻辑复杂。核心审核状态变更逻辑预计只有约 100～180 行；其余改动用于保证 HTTP、Mock、Tuxedo、Oracle 和部署链路能够完整验证。
 
-### 19.1 发布单元
+## 20. POC 升级边界
 
-以下制品必须作为同一版本发布：
+如果后续从 POC 进入生产，应另行评审以下能力，不在本次代码中预埋：
 
-- `cnapspocsvr` 原生服务二进制。
-- TUXCONFIG 源配置。
-- Jolt metadata repository 源文件及重新加载结果。
-- `ruisui-bank-sim.war`。
-- 冒烟脚本和运维文档。
+- 审核权限和录入审核分离。
+- 审核意见及退回原因。
+- 审核流水表和完整历史追踪。
+- 幂等请求和重放保护。
+- 批量审核、多级审核、撤销审核。
+- 监控指标、告警、容量和性能压测。
 
-只发布 WAR 会导致 Jolt 找不到审核服务；只发布 C 服务则页面和 WebFE 仍会返回 405。
-
-### 19.2 回滚策略
-
-1. 保留上一个版本的 WAR、C 二进制、UBBCONFIG 和 Jolt metadata 源文件。
-2. 回滚时停止 Tomcat 和 Tuxedo，成套恢复四类制品，再重新加载 metadata 和 TUXCONFIG。
-3. 审核产生的 `20_REVIEW_APPROVED`、`30_REVIEW_REJECTED` 数据不回滚、不改回 `00_DRAFT`。
-4. 若上一个应用版本不识别审核状态，则不得直接应用回滚，必须先评估兼容补丁。
-5. 数据迁移脚本没有反向迁移；禁止把已迁移记录改回已退役状态。
-
-## 20. 风险与控制
-
-| 风险 | 影响 | 控制措施 |
-| --- | --- | --- |
-| 只恢复 WebFE，未注册 Tuxedo 服务 | 运行时返回 `4003` | 部署制品契约测试和完整重建部署 |
-| Jolt 把审核列表当单记录读取 | 列表为空或只显示一条 | 将 `CNAPS5702Q` 加入 `PAGE_SERVICES` 并做 occurrence 测试 |
-| `CHECKER_TIME` 未写入 | 审计信息不完整 | 恢复 DB 动作感知时间逻辑并测试 |
-| 两次并发审核都成功 | 状态和审计不确定 | `VERSION_NO` 乐观锁；Mock 同步；并发测试 |
-| 超时后前端自动重试 | 重复副作用 | 审核 POST 不自动重试，只刷新确认 |
-| API 文档与历史字段不一致 | 前后端依赖错误字段 | 当前 `cnaps-frontend-api.md` 为唯一外部契约，响应层过滤内部字段 |
-| 旧 Jolt 定义残留 | 参数方向不一致 | 加载前删除旧服务定义，再加载完整新定义 |
-| 页面直接拼接服务端文本 | XSS | DOM 文本渲染和 URL 编码 |
-| 只替换 WAR | 审核不可用 | 原生服务、配置、metadata、WAR 成套发布 |
-
-## 21. 开发完成检查表
-
-- [ ] 审核页和全局导航完成。
-- [ ] 审核列表、分页、状态和详情完成。
-- [ ] 通过、退回确认及错误反馈完成。
-- [ ] Servlet 放行审核 POST，旧 GET 仍为 405。
-- [ ] `TuxedoRequestMapper` 三个服务映射完成。
-- [ ] Mock 审核状态、审计、并发行为完成。
-- [ ] Jolt 分页服务和 output-only 字段处理完成。
-- [ ] `CNAPS5702Q/A/R` 原生服务完成。
-- [ ] 审核时间和乐观锁验证完成。
-- [ ] Makefile、主程序、UBBCONFIG、Jolt metadata 完成。
-- [ ] API 不接收审核意见和退回原因。
-- [ ] Maven 测试和 WAR 打包通过。
-- [ ] Linux C 编译、metadata/TUXCONFIG 加载通过。
-- [ ] 完整部署、健康检查和冒烟测试通过。
-- [ ] 运维文档包含发布、验证和回滚说明。
+POC 阶段不为这些未来能力增加抽象层或占位代码。

@@ -174,11 +174,8 @@ PUT /api/cnaps/vouchers/{billId}
 POST /api/cnaps/vouchers/{billId}/delete
 ```
 
-可选 Body：
+无需传入 Body。
 
-```json
-{ "deleteReason": "录入错误" }
-```
 
 仅 `10_PENDING_REVIEW`、`30_REVIEW_REJECTED` 状态可删除。删除为逻辑删除，成功后状态为 `40_DELETED`。
 
@@ -308,9 +305,6 @@ POST /api/cnaps/vouchers/{billId}/review-return
 | `serialNo` | string | 流水号 |
 | `status` | string | 单据状态 |
 | `checkerNo` / `checkerTime` | string | 最近复核人 / 时间 |
-| `reviewComment` | string | 复核意见 |
-| `rejectReason` | string | 退回原因 |
-| `deleteReason` | string | 删除原因 |
 | `deleteOperatorNo` / `deleteTime` | string | 删除人 / 时间 |
 | `lastAction` | string | 最后动作 |
 | `lastOperatorNo` | string | 最后操作员 |

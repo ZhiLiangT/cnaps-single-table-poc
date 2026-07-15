@@ -19,15 +19,23 @@ public final class JsonSupport {
     }
 
     public static Map<String, Object> readBodyMap(HttpServletRequest request) throws IOException {
-        if (request.getContentLengthLong() == 0) {
+        long contentLength = request.getContentLengthLong();
+        if (contentLength == 0) {
             return new LinkedHashMap<>();
         }
         String contentType = request.getContentType();
         if (contentType == null || !contentType.toLowerCase().contains("application/json")) {
             return new LinkedHashMap<>();
         }
-        return OBJECT_MAPPER.readValue(request.getInputStream(), new TypeReference<LinkedHashMap<String, Object>>() {
-        });
+        try {
+            return OBJECT_MAPPER.readValue(request.getInputStream(), new TypeReference<LinkedHashMap<String, Object>>() {
+            });
+        } catch (com.fasterxml.jackson.databind.exc.MismatchedInputException e) {
+            if (contentLength < 0) {
+                return new LinkedHashMap<>();
+            }
+            throw e;
+        }
     }
 
     public static void write(HttpServletResponse response, int status, Object body) throws IOException {

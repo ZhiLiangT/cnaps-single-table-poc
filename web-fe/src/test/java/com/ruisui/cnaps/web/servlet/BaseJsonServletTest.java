@@ -222,6 +222,72 @@ class BaseJsonServletTest {
     }
 
     @Test
+    void rejectsReviewActionGetRequestsWithoutCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        for (String path : List.of(
+            "/api/cnaps/vouchers/BILL-1/review-pass",
+            "/api/cnaps/vouchers/BILL-1/review-return"
+        )) {
+            captured.set(null);
+            AtomicInteger status = new AtomicInteger();
+            servlet.doGet(
+                request(path, path.substring(19), Map.of()),
+                response(new ByteArrayOutputStream(), status)
+            );
+
+            assertThat(status.get()).as(path).isEqualTo(405);
+            assertThat(captured.get()).as(path).isNull();
+        }
+    }
+
+    @Test
+    void acceptsEmptyJsonBodyForPostActions() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+        byte[] empty = new byte[0];
+        ServletInputStream emptyInput = new ServletInputStream() {
+            private final ByteArrayInputStream delegate = new ByteArrayInputStream(empty);
+
+            @Override
+            public int read() {
+                return delegate.read();
+            }
+
+            @Override
+            public boolean isFinished() {
+                return delegate.available() == 0;
+            }
+
+            @Override
+            public boolean isReady() {
+                return true;
+            }
+
+            @Override
+            public void setReadListener(ReadListener readListener) {
+            }
+        };
+        HttpServletRequest emptyBodyRequest = proxy(HttpServletRequest.class, (method, args) -> switch (method.getName()) {
+            case "getMethod" -> "POST";
+            case "getRequestURI" -> "/api/cnaps/vouchers/BILL-1/delete";
+            case "getContextPath" -> "";
+            case "getPathInfo" -> "/BILL-1/delete";
+            case "getContentType" -> "application/json; charset=UTF-8";
+            case "getContentLengthLong" -> -1L;
+            case "getInputStream" -> emptyInput;
+            default -> defaultValue(method.getReturnType());
+        });
+
+        servlet.doPost(emptyBodyRequest, response(new ByteArrayOutputStream()));
+
+        assertThat(captured.get().fields())
+            .containsEntry("BILL_ID", "BILL-1")
+            .doesNotContainKey("STATUS");
+    }
+
+    @Test
     void rejectsRemovedReviewPostsWithoutCallingTuxedo() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);

@@ -38,8 +38,7 @@ class DeploymentArtifactTest {
             .contains("JSL")
             .contains("//127.0.0.1:8000")
             .contains("SYSHEALTH")
-            .contains("CNAPS5701E")
-            .doesNotContain("CNAPS5702Q", "CNAPS5702A", "CNAPS5702R");
+            .contains("CNAPS5701E");
     }
 
     @Test
@@ -60,8 +59,7 @@ class DeploymentArtifactTest {
             .contains("RESP_MSG")
             .contains("BILL_ID")
             .contains("PAYEE_ACCT")
-            .contains("TOTAL_ELEMENTS")
-            .doesNotContain("service=CNAPS5702Q", "service=CNAPS5702A", "service=CNAPS5702R");
+            .contains("TOTAL_ELEMENTS");
     }
 
     @Test

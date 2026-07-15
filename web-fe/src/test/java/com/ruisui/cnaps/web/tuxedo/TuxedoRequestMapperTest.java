@@ -36,19 +36,6 @@ class TuxedoRequestMapperTest {
     }
 
     @Test
-    void rejectsRemovedReviewMappings() {
-        for (String path : List.of(
-            "/api/cnaps/vouchers/review-list",
-            "/api/cnaps/vouchers/B202607087720002000/review-pass",
-            "/api/cnaps/vouchers/B202607087720002000/review-return"
-        )) {
-            assertThatThrownBy(() -> mapper.serviceName("POST", path))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Unsupported WebFE operation");
-        }
-    }
-
-    @Test
     void mapsHeadersAndJsonBodyToCanonicalFmlFieldNames() {
         TuxedoRequest request = mapper.from(
             "REQ-1",

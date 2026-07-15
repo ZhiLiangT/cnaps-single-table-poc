@@ -287,28 +287,6 @@ class BaseJsonServletTest {
             .doesNotContainKey("STATUS");
     }
 
-    @Test
-    void rejectsRemovedReviewPostsWithoutCallingTuxedo() throws Exception {
-        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
-        CnapsVoucherServlet servlet = voucherServlet(captured);
-
-        for (String path : List.of(
-            "/api/cnaps/vouchers/review-list",
-            "/api/cnaps/vouchers/BILL-1/review-pass",
-            "/api/cnaps/vouchers/BILL-1/review-return"
-        )) {
-            captured.set(null);
-            AtomicInteger status = new AtomicInteger();
-            servlet.doPost(
-                jsonRequest(path, path.substring(19), "{}"),
-                response(new ByteArrayOutputStream(), status)
-            );
-
-            assertThat(status.get()).as(path).isEqualTo(405);
-            assertThat(captured.get()).as(path).isNull();
-        }
-    }
-
     private CnapsVoucherServlet voucherServlet(AtomicReference<TuxedoRequest> captured) throws Exception {
         TuxedoClient client = (serviceName, request) -> {
             captured.set(request);

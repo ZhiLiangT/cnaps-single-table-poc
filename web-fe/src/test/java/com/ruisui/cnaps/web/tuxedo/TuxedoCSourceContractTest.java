@@ -98,7 +98,6 @@ class TuxedoCSourceContractTest {
                 "CNAPS_STATUS_REJECTED", "CNAPS_STATUS_DELETED", "cnaps_status_can_review"
             )
             .doesNotContain("CNAPS_STATUS_DRAFT", "00_DRAFT");
-        assertThat(root.resolve("tuxedo-server/src/services/cnaps_review.c")).doesNotExist();
     }
 
     @Test

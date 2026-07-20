@@ -1,6 +1,6 @@
 # CNAPS 凭证审核设计（POC 生产代码执行版）
 
-> 版本：v1.5 ｜ 日期：2026-07-15 ｜ 需求：`docs/cnaps-review-requirements.md` v1.4
+> 版本：v1.5 ｜ 日期：2026-07-15 ｜ 需求：`docs/requirements/cnaps-review-requirements.md` v1.4
 
 ## 1. OpenCode 执行目标
 

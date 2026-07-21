@@ -148,6 +148,43 @@ class JoltTuxedoClientTest {
     }
 
     @Test
+    void reviewActionResponsesExposeOnlyTheSixFieldSummary() throws Exception {
+        JoltTuxedoClient client = new JoltTuxedoClient(TuxedoRuntimeConfig.defaults("jolt"));
+        Method readResponseFields = JoltTuxedoClient.class.getDeclaredMethod(
+            "readResponseFields",
+            String.class,
+            Class.class,
+            Object.class
+        );
+        readResponseFields.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> fields = (Map<String, Object>) readResponseFields.invoke(
+            client,
+            "CNAPS5702A",
+            FakeReviewActionService.class,
+            new FakeReviewActionService()
+        );
+        ApiResponse<Object> response = new TuxedoResponseMapper().toApiResponse(
+            "REQ-1",
+            TuxedoResponse.ok("ok", fields)
+        );
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mapped = (Map<String, Object>) response.data();
+
+        assertThat(mapped.keySet()).containsExactlyInAnyOrder(
+            "billId", "status", "checkerNo", "checkerTime", "lastAction", "versionNo"
+        );
+        assertThat(mapped)
+            .containsEntry("billId", "value-BILL_ID")
+            .containsEntry("status", "value-STATUS")
+            .containsEntry("checkerNo", "value-CHECKER_NO")
+            .containsEntry("checkerTime", "value-CHECKER_TIME")
+            .containsEntry("lastAction", "value-LAST_ACTION")
+            .containsEntry("versionNo", 2L);
+    }
+
+    @Test
     void returnsUnavailableWhenJoltRuntimeClassesAreMissing() {
         TuxedoRuntimeConfig config = TuxedoRuntimeConfig.defaults("jolt");
         JoltTuxedoClient client = new JoltTuxedoClient(config, new EmptyClassLoader());
@@ -230,6 +267,16 @@ class JoltTuxedoClientTest {
 
         public int getIntDef(String fieldName, int defaultValue) {
             return "VERSION_NO".equals(fieldName) ? 7 : defaultValue;
+        }
+    }
+
+    public static final class FakeReviewActionService {
+        public String getStringDef(String fieldName, String defaultValue) {
+            return "VERSION_NO".equals(fieldName) ? defaultValue : "value-" + fieldName;
+        }
+
+        public int getIntDef(String fieldName, int defaultValue) {
+            return "VERSION_NO".equals(fieldName) ? 2 : defaultValue;
         }
     }
 

@@ -41,6 +41,19 @@ public final class RequestSupport {
         }
     }
 
+    public static String reviewActionBillId(String pathInfo) {
+        if (pathInfo == null || pathInfo.isBlank() || "/".equals(pathInfo)) {
+            return null;
+        }
+        String[] segments = pathInfo.substring(1).split("/");
+        if (segments.length == 2
+            && !segments[0].isBlank()
+            && ("review-pass".equals(segments[1]) || "review-return".equals(segments[1]))) {
+            return segments[0];
+        }
+        return null;
+    }
+
     public static String validateWorkDateFilter(Map<String, Object> fields) {
         if (fields.containsKey("workDate")) {
             return "列表查询不支持 workDate，请使用 startWorkDate/endWorkDate";
@@ -59,6 +72,14 @@ public final class RequestSupport {
             return "开始工作日期不能晚于结束工作日期";
         }
         return null;
+    }
+
+    public static String validateReviewPageFilter(Map<String, Object> fields) {
+        String pageNoError = validateOptionalPositiveInt(fields.get("pageNo"), "pageNo", Integer.MAX_VALUE);
+        if (pageNoError != null) {
+            return pageNoError;
+        }
+        return validateOptionalPositiveInt(fields.get("pageSize"), "pageSize", 100);
     }
 
     public static boolean isValidWorkDate(String value) {
@@ -82,6 +103,27 @@ public final class RequestSupport {
 
     private static boolean isValidOptionalWorkDate(String value) {
         return value == null || isValidWorkDate(value);
+    }
+
+    private static String validateOptionalPositiveInt(Object value, String fieldName, int maximum) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            long parsed = number.longValue();
+            return raw == parsed && parsed >= 1L && parsed <= maximum
+                ? null
+                : fieldName + " 必须为有效范围内的正整数";
+        }
+        try {
+            long parsed = Long.parseLong(String.valueOf(value));
+            return parsed >= 1L && parsed <= maximum
+                ? null
+                : fieldName + " 必须为有效范围内的正整数";
+        } catch (NumberFormatException ex) {
+            return fieldName + " 必须为有效范围内的正整数";
+        }
     }
 
     private static void removeBlank(Map<String, Object> fields, String key) {

@@ -11,6 +11,7 @@ public class JoltTuxedoClient implements TuxedoClient {
     private static final int MAX_RESPONSE_OCCURRENCES = 1_000;
     private static final List<String> ENVELOPE_FIELDS = List.of("RESP_CODE", "RESP_MSG");
     private static final List<String> PAGE_SERVICES = List.of("BANKQRY", "CNAPS4609Q");
+    private static final List<String> REVIEW_ACTION_SERVICES = List.of("CNAPS5702A", "CNAPS5702R");
     private static final List<String> OPERATOR_NO_OUTPUT_ONLY_SERVICES = List.of("CNAPS4609Q");
     private static final List<String> DICTIONARY_FIELDS = List.of(
         "DICT_TYPE", "DICT_CODE", "DICT_NAME", "SORT_NO"
@@ -19,14 +20,12 @@ public class JoltTuxedoClient implements TuxedoClient {
         "BANK_NO", "BANK_NAME", "CITY", "SYSTEM_TYPE"
     );
     private static final List<String> VOUCHER_FIELDS = List.of(
-        "BILL_ID", "WORK_DATE", "BRANCH_NO", "OPERATOR_NO", "SERIAL_NO", "BUSINESS_TYPE",
-        "ACCOUNT_PART1", "ACCOUNT_PART2", "ACCOUNT_PART3", "ACCOUNT_NAME", "PAYER_NAME",
-        "PAYEE_ACCT", "PAYEE_NAME", "PRIORITY", "RECEIVE_BANK_NO", "RECEIVE_BANK_NAME",
-        "SYSTEM_TYPE", "AMOUNT", "DEBIT_MODE", "FEE_AMOUNT", "FEE_CHARGE_MODE", "SEND_MODE",
-        "FAX_FLAG", "VOUCHER_NO", "REMARK", "STATUS", "CHECKER_NO", "CHECKER_TIME",
-        "REJECT_REASON", "REVIEW_COMMENT", "DELETE_REASON", "DELETE_OPERATOR_NO", "DELETE_TIME",
-        "LAST_ACTION", "LAST_OPERATOR_NO", "LAST_REQUEST_ID", "LAST_ACTION_TIME", "CREATED_AT",
-        "UPDATED_AT", "VERSION_NO"
+        "BILL_ID", "WORK_DATE", "SERIAL_NO", "VOUCHER_NO", "PAYEE_ACCT", "PAYEE_NAME",
+        "AMOUNT", "STATUS", "VERSION_NO"
+    );
+    private static final List<String> REVIEW_ACTION_FIELDS = List.of(
+        "RESP_CODE", "RESP_MSG", "BILL_ID", "STATUS", "CHECKER_NO", "CHECKER_TIME",
+        "LAST_ACTION", "VERSION_NO"
     );
     private static final List<String> RESPONSE_FIELDS = List.of(
         "RESP_CODE", "RESP_MSG", "WEBFE", "TUXEDO", "ORACLE", "SERVICE", "CHECK_TIME",
@@ -211,6 +210,9 @@ public class JoltTuxedoClient implements TuxedoClient {
             ));
             return fields;
         }
+        if (REVIEW_ACTION_SERVICES.contains(serviceName)) {
+            return readFields(remoteServiceClass, remoteService, REVIEW_ACTION_FIELDS);
+        }
         if (PAGE_SERVICES.contains(serviceName)) {
             Map<String, Object> fields = readFields(remoteServiceClass, remoteService, ENVELOPE_FIELDS);
             long pageNo = positiveLong(getLong(remoteServiceClass, remoteService, "PAGE_NO"), 1L);
@@ -276,6 +278,8 @@ public class JoltTuxedoClient implements TuxedoClient {
                 Object value = getItem(remoteServiceClass, remoteService, fieldName, occurrence);
                 if (value != null && !"".equals(value)) {
                     record.put(fieldName, value);
+                } else if ("VOUCHER_NO".equals(fieldName)) {
+                    record.put(fieldName, "");
                 }
             }
             records.add(record);

@@ -243,6 +243,103 @@ class BaseJsonServletTest {
     }
 
     @Test
+    void reviewListForcesPendingStatusAndDropsClientContext() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        servlet.doPost(
+            jsonRequest(
+                "/api/cnaps/vouchers/review-list",
+                "/review-list",
+                """
+                    {"status":"20_REVIEW_APPROVED","branchNo":"CLIENT-BRANCH","operatorNo":"CLIENT-OP",
+                    "requestId":"CLIENT-REQ","includeDeleted":"true","serialNo":"0002000","pageNo":2,"pageSize":5}
+                    """
+            ),
+            response(new ByteArrayOutputStream())
+        );
+
+        assertThat(captured.get().fields())
+            .containsEntry("STATUS", "10_PENDING_REVIEW")
+            .containsEntry("SERIAL_NO", "0002000")
+            .containsEntry("PAGE_NO", 2)
+            .containsEntry("PAGE_SIZE", 5)
+            .containsEntry("OPERATOR_NO", "SERVER-OP")
+            .containsEntry("BRANCH_NO", "SERVER-BRANCH")
+            .doesNotContainKeys("INCLUDE_DELETED")
+            .doesNotContainValue("CLIENT-BRANCH")
+            .doesNotContainValue("CLIENT-OP")
+            .doesNotContainValue("CLIENT-REQ");
+    }
+
+    @Test
+    void rejectsInvalidReviewListPageBoundsWithoutCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+        List<String> invalidFilters = List.of(
+            "{\"pageNo\":0}",
+            "{\"pageSize\":101}",
+            "{\"pageSize\":1.5}",
+            "{\"workDate\":\"2026-07-08\"}"
+        );
+
+        for (String filter : invalidFilters) {
+            captured.set(null);
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            AtomicInteger status = new AtomicInteger();
+
+            servlet.doPost(
+                jsonRequest("/api/cnaps/vouchers/review-list", "/review-list", filter),
+                response(body, status)
+            );
+
+            assertThat(status.get()).as(filter).isEqualTo(400);
+            assertThat(body.toString(StandardCharsets.UTF_8)).as(filter).contains("\"respCode\":\"2002\"");
+            assertThat(captured.get()).as(filter).isNull();
+        }
+    }
+
+    @Test
+    void reviewActionsUseOnlyUrlBillIdAndIgnoreRequestBody() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+
+        servlet.doPost(
+            jsonRequest(
+                "/api/cnaps/vouchers/BILL-URL/review-pass",
+                "/BILL-URL/review-pass",
+                "{\"billId\":\"BILL-BODY\",\"status\":\"30_REVIEW_REJECTED\",\"reviewComment\":\"ignored\"}"
+            ),
+            response(new ByteArrayOutputStream())
+        );
+
+        assertThat(captured.get().fields())
+            .containsEntry("BILL_ID", "BILL-URL")
+            .containsEntry("OPERATOR_NO", "SERVER-OP")
+            .containsEntry("BRANCH_NO", "SERVER-BRANCH")
+            .doesNotContainKeys("STATUS", "REVIEW_COMMENT")
+            .doesNotContainValue("BILL-BODY");
+    }
+
+    @Test
+    void reviewActionsRejectMissingBillIdWithoutCallingTuxedo() throws Exception {
+        AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
+        CnapsVoucherServlet servlet = voucherServlet(captured);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        AtomicInteger status = new AtomicInteger();
+
+        servlet.doPost(
+            jsonRequest("/api/cnaps/vouchers/review-pass", "/review-pass", "{}"),
+            response(body, status)
+        );
+
+        assertThat(status.get()).isEqualTo(400);
+        assertThat(body.toString(StandardCharsets.UTF_8))
+            .isEqualTo("{\"respCode\":\"2001\",\"respMsg\":\"billId is required\",\"data\":null}");
+        assertThat(captured.get()).isNull();
+    }
+
+    @Test
     void acceptsEmptyJsonBodyForPostActions() throws Exception {
         AtomicReference<TuxedoRequest> captured = new AtomicReference<>();
         CnapsVoucherServlet servlet = voucherServlet(captured);

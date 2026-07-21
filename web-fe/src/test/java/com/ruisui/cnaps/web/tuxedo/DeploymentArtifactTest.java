@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeploymentArtifactTest {
     private static final String[] EXPORTED_SERVICES = {
         "SYSHEALTH", "DICTQRY", "BANKQRY", "CNAPS5701E", "CNAPS5701U", "CNAPS5701D",
-        "CNAPS4609Q", "CNAPS5702I"
+        "CNAPS4609Q", "CNAPS5702I", "CNAPS5702A", "CNAPS5702R"
     };
     private static final String[] VOUCHER_RECORD_FIELDS = {
         "BILL_ID", "WORK_DATE", "BRANCH_NO", "OPERATOR_NO", "SERIAL_NO", "BUSINESS_TYPE",
@@ -54,6 +54,8 @@ class DeploymentArtifactTest {
             .contains("CNAPS5701D")
             .contains("CNAPS4609Q")
             .contains("CNAPS5702I")
+            .contains("CNAPS5702A")
+            .contains("CNAPS5702R")
             .contains("REQUEST_ID")
             .contains("RESP_CODE")
             .contains("RESP_MSG")
@@ -170,6 +172,44 @@ class DeploymentArtifactTest {
         }
 
         assertScalarParam(metadata, "CNAPS5701D", "DELETE_REASON", "string", "inout");
+    }
+
+    @Test
+    void reviewActionMetadataUsesOnlyTheApprovedSummaryFields() throws Exception {
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+
+        for (String service : new String[] {"CNAPS5702A", "CNAPS5702R"}) {
+            assertScalarParam(metadata, service, "REQUEST_ID", "string", "in");
+            assertScalarParam(metadata, service, "REQ_ID", "string", "in");
+            assertScalarParam(metadata, service, "OPERATOR_NO", "string", "in");
+            assertScalarParam(metadata, service, "BRANCH_NO", "string", "in");
+            assertScalarParam(metadata, service, "BILL_ID", "string", "inout");
+            assertScalarParam(metadata, service, "STATUS", "string", "out");
+            assertScalarParam(metadata, service, "CHECKER_NO", "string", "out");
+            assertScalarParam(metadata, service, "CHECKER_TIME", "string", "out");
+            assertScalarParam(metadata, service, "LAST_ACTION", "string", "out");
+            assertScalarParam(metadata, service, "VERSION_NO", "long", "out");
+            assertThat(serviceMetadata(metadata, service))
+                .doesNotContain("REVIEW_COMMENT", "REJECT_REASON", "CNAPS5702Q");
+        }
+    }
+
+    @Test
+    void reviewActionServicesAreRegisteredWithoutRestoringTheRetiredQueryService() throws Exception {
+        String mapper = Files.readString(root.resolve(
+            "web-fe/src/main/java/com/ruisui/cnaps/web/tuxedo/TuxedoRequestMapper.java"
+        ));
+        String server = Files.readString(root.resolve("tuxedo-server/src/cnapspocsvr.c"));
+        String makefile = Files.readString(root.resolve("tuxedo-server/Makefile"));
+        String ubb = Files.readString(root.resolve("tuxedo/UBBCONFIG"));
+        String metadata = Files.readString(root.resolve("tuxedo/jolt/cnaps_services.bulk"));
+
+        assertThat(mapper).contains("CNAPS4609Q", "CNAPS5702A", "CNAPS5702R");
+        assertThat(server).contains("void CNAPS5702A", "void CNAPS5702R");
+        assertThat(makefile).contains("CNAPS5702A CNAPS5702R").doesNotContain("CNAPS5702Q");
+        assertThat(ubb).contains("CNAPS5702A", "CNAPS5702R").doesNotContain("CNAPS5702Q");
+        assertThat(metadata).contains("service=CNAPS5702A", "service=CNAPS5702R")
+            .doesNotContain("service=CNAPS5702Q");
     }
 
     @Test
@@ -624,13 +664,6 @@ class DeploymentArtifactTest {
             return "inout";
         }
         if ("CNAPS5701D".equals(service) && "DELETE_REASON".equals(field)) {
-            return "inout";
-        }
-        if (("CNAPS5702A".equals(service) || "CNAPS5702R".equals(service))
-            && "REVIEW_COMMENT".equals(field)) {
-            return "inout";
-        }
-        if ("CNAPS5702R".equals(service) && "REJECT_REASON".equals(field)) {
             return "inout";
         }
         return "out";

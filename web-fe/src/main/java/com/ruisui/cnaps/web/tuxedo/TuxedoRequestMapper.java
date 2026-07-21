@@ -55,12 +55,24 @@ public class TuxedoRequestMapper {
         if ("POST".equals(verb) && "/api/cnaps/vouchers/query".equals(cleanPath)) {
             return "CNAPS4609Q";
         }
+        if ("POST".equals(verb) && "/api/cnaps/vouchers/review-list".equals(cleanPath)) {
+            return "CNAPS4609Q";
+        }
         if (cleanPath.startsWith("/api/cnaps/vouchers/")) {
             if ("PUT".equals(verb)) {
                 return "CNAPS5701U";
             }
+            if ("POST".equals(verb) && cleanPath.endsWith("/review-pass")) {
+                return "CNAPS5702A";
+            }
+            if ("POST".equals(verb) && cleanPath.endsWith("/review-return")) {
+                return "CNAPS5702R";
+            }
             if ("GET".equals(verb)
-                && !"/api/cnaps/vouchers/query".equals(cleanPath)) {
+                && !"/api/cnaps/vouchers/query".equals(cleanPath)
+                && !"/api/cnaps/vouchers/review-list".equals(cleanPath)
+                && !cleanPath.endsWith("/review-pass")
+                && !cleanPath.endsWith("/review-return")) {
                 return "CNAPS5702I";
             }
             if ("POST".equals(verb) && cleanPath.endsWith("/delete")) {

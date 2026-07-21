@@ -55,6 +55,7 @@ int db_commit(void);
 int db_rollback(void);
 int db_insert_voucher(const cnaps_voucher_row *row);
 int db_update_voucher(const cnaps_voucher_row *row);
+int db_review_voucher(const cnaps_voucher_row *row);
 int db_find_voucher(const char *bill_id, cnaps_voucher_row *row);
 int db_query_vouchers(
     const char *start_work_date,

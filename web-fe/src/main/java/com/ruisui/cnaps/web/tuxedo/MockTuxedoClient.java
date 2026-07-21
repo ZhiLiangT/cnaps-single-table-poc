@@ -53,8 +53,12 @@ public class MockTuxedoClient implements TuxedoClient {
         "VOUCHER_NO",
         "REMARK"
     );
-    private static final Set<String> DETAIL_ONLY_FIELDS = Set.of(
-        "PAYER_ADDRESS", "PAYEE_ADDRESS", "PAYER_BANK_NAME"
+    private static final List<String> LIST_FIELDS = List.of(
+        "BILL_ID", "WORK_DATE", "SERIAL_NO", "VOUCHER_NO", "PAYEE_ACCT", "PAYEE_NAME",
+        "AMOUNT", "STATUS", "VERSION_NO"
+    );
+    private static final List<String> REVIEW_ACTION_FIELDS = List.of(
+        "BILL_ID", "STATUS", "CHECKER_NO", "CHECKER_TIME", "LAST_ACTION", "VERSION_NO"
     );
     private static final Map<String, List<Map<String, Object>>> DICTIONARIES = Map.of(
         "BUSINESS_TYPE", List.of(dictItem("BUSINESS_TYPE", "02102", "普通汇兑", 1)),
@@ -105,6 +109,8 @@ public class MockTuxedoClient implements TuxedoClient {
             case "CNAPS5701E" -> create(request);
             case "CNAPS4609Q" -> ok("查询成功", data(voucherPage(request, null)));
             case "CNAPS5702I" -> detail(request);
+            case "CNAPS5702A" -> review(request, "20_REVIEW_APPROVED", "REVIEW_PASS", "review pass success");
+            case "CNAPS5702R" -> review(request, "30_REVIEW_REJECTED", "REVIEW_RETURN", "review return success");
             case "CNAPS5701U" -> update(request);
             case "CNAPS5701D" -> delete(request);
             default -> TuxedoResponse.fail("4003", "Tuxedo服务不可用：" + serviceName);
@@ -212,6 +218,30 @@ public class MockTuxedoClient implements TuxedoClient {
             return TuxedoResponse.fail("3001", "单据不存在");
         }
         return ok("查询成功", voucher);
+    }
+
+    private TuxedoResponse review(
+        TuxedoRequest request,
+        String targetStatus,
+        String lastAction,
+        String message
+    ) {
+        Map<String, Object> voucher = load(request);
+        if (voucher == null) {
+            return TuxedoResponse.fail("3001", "单据不存在");
+        }
+        synchronized (voucher) {
+            if (!"10_PENDING_REVIEW".equals(voucher.get("STATUS"))) {
+                return TuxedoResponse.fail("3004", "当前状态不允许审核");
+            }
+            voucher.put("STATUS", targetStatus);
+            voucher.put("CHECKER_NO", text(request, "OPERATOR_NO"));
+            voucher.put("CHECKER_TIME", now());
+            voucher.put("LAST_ACTION", lastAction);
+            voucher.put("VERSION_NO", number(voucher, "VERSION_NO") + 1);
+            touch(voucher, request);
+            return ok(message, reviewSummary(voucher));
+        }
     }
 
     private Map<String, Object> voucherPage(TuxedoRequest request, String forcedStatus) {
@@ -344,9 +374,20 @@ public class MockTuxedoClient implements TuxedoClient {
     }
 
     private Map<String, Object> listRecord(Map<String, Object> voucher) {
-        Map<String, Object> record = new LinkedHashMap<>(voucher);
-        DETAIL_ONLY_FIELDS.forEach(record::remove);
+        Map<String, Object> record = new LinkedHashMap<>();
+        for (String field : LIST_FIELDS) {
+            Object value = voucher.get(field);
+            record.put(field, value == null && "VOUCHER_NO".equals(field) ? "" : value);
+        }
         return record;
+    }
+
+    private Map<String, Object> reviewSummary(Map<String, Object> voucher) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        for (String field : REVIEW_ACTION_FIELDS) {
+            summary.put(field, voucher.get(field));
+        }
+        return summary;
     }
 
     private TuxedoResponse validateDictionaryFields(TuxedoRequest request) {

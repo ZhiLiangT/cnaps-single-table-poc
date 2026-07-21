@@ -319,6 +319,18 @@ int db_update_voucher(const cnaps_voucher_row *row)
     return execute_dml(sql, row, 1);
 }
 
+int db_review_voucher(const cnaps_voucher_row *row)
+{
+    static const char *sql =
+        "UPDATE T_CNAPS_BILL_POC SET "
+        "STATUS=:status, CHECKER_NO=:checker_no, CHECKER_TIME=SYSTIMESTAMP, "
+        "LAST_ACTION=:last_action, LAST_OPERATOR_NO=:last_operator_no, LAST_REQUEST_ID=:last_request_id, "
+        "LAST_ACTION_TIME=SYSTIMESTAMP, UPDATED_AT=SYSTIMESTAMP, VERSION_NO=NVL(VERSION_NO, 1) + 1 "
+        "WHERE BILL_ID=:bill_id AND NVL(VERSION_NO, 1)=:version_no";
+
+    return execute_dml(sql, row, 1);
+}
+
 static int define_text(OCIStmt *stmt, int position, char *buffer, ub4 buffer_size, sb2 *indicator)
 {
     OCIDefine *define = NULL;

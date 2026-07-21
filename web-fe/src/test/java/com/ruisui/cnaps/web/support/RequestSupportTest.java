@@ -43,6 +43,14 @@ class RequestSupportTest {
     }
 
     @Test
+    void extractsReviewActionBillIdOnlyFromStrictActionPaths() {
+        assertThat(RequestSupport.reviewActionBillId("/BILL-1/review-pass")).isEqualTo("BILL-1");
+        assertThat(RequestSupport.reviewActionBillId("/BILL-1/review-return")).isEqualTo("BILL-1");
+        assertThat(RequestSupport.reviewActionBillId("/review-pass")).isNull();
+        assertThat(RequestSupport.reviewActionBillId("/BILL-1/review-pass/extra")).isNull();
+    }
+
+    @Test
     void acceptsMissingWorkDateFiltersWithoutAddingDefaults() {
         Map<String, Object> fields = new LinkedHashMap<>();
 
@@ -95,6 +103,20 @@ class RequestSupportTest {
         assertThat(RequestSupport.isValidWorkDate("9999-12-31")).isTrue();
         assertThat(RequestSupport.isValidWorkDate("0000-01-01")).isFalse();
         assertThat(RequestSupport.isValidWorkDate("2026-07-10-extra")).isFalse();
+    }
+
+    @Test
+    void validatesReviewPageBounds() {
+        assertThat(RequestSupport.validateReviewPageFilter(new LinkedHashMap<>(Map.of(
+            "pageNo", 1,
+            "pageSize", 100
+        )))).isNull();
+        assertThat(RequestSupport.validateReviewPageFilter(new LinkedHashMap<>(Map.of("pageNo", 0))))
+            .contains("pageNo");
+        assertThat(RequestSupport.validateReviewPageFilter(new LinkedHashMap<>(Map.of("pageSize", 101))))
+            .contains("pageSize");
+        assertThat(RequestSupport.validateReviewPageFilter(new LinkedHashMap<>(Map.of("pageSize", "1.5"))))
+            .contains("pageSize");
     }
 
     private HttpServletRequest request(String uri, String contextPath, Map<String, String[]> parameters) {

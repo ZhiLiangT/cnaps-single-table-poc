@@ -35,6 +35,12 @@ class JoltPagedResponseTest {
         assertThat(data).containsEntry("PAGE_NO", 1L).containsEntry("PAGE_SIZE", 10L).containsEntry("TOTAL", 2L);
         assertThat(records).extracting(record -> record.get("BILL_ID"))
             .containsExactly("BILL-1", "BILL-2");
+        assertThat(records).allSatisfy(record -> assertThat(record.keySet()).containsExactly(
+            "BILL_ID", "WORK_DATE", "SERIAL_NO", "VOUCHER_NO", "PAYEE_ACCT", "PAYEE_NAME",
+            "AMOUNT", "STATUS", "VERSION_NO"
+        ));
+        assertThat(records).extracting(record -> record.get("VOUCHER_NO"))
+            .containsExactly("", "V-2");
         assertThat(records).extracting(record -> record.get("STATUS"))
             .containsOnly("10_PENDING_REVIEW");
         assertThat(records).extracting(record -> record.get("VERSION_NO"))
@@ -81,6 +87,24 @@ class JoltPagedResponseTest {
         public String getStringItemDef(String name, int occurrence, String defaultValue) {
             if ("BILL_ID".equals(name) && occurrence < 2) {
                 return "BILL-" + (occurrence + 1);
+            }
+            if ("WORK_DATE".equals(name) && occurrence < 2) {
+                return "2026-07-1" + (occurrence + 1);
+            }
+            if ("SERIAL_NO".equals(name) && occurrence < 2) {
+                return "000200" + occurrence;
+            }
+            if ("VOUCHER_NO".equals(name) && occurrence == 1) {
+                return "V-2";
+            }
+            if ("PAYEE_ACCT".equals(name) && occurrence < 2) {
+                return "62220000000000000" + occurrence;
+            }
+            if ("PAYEE_NAME".equals(name) && occurrence < 2) {
+                return "payee-" + occurrence;
+            }
+            if ("AMOUNT".equals(name) && occurrence < 2) {
+                return "100.00";
             }
             if ("STATUS".equals(name) && occurrence < 2) {
                 return "10_PENDING_REVIEW";

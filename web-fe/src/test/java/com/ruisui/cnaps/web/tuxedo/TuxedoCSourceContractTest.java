@@ -454,6 +454,41 @@ class TuxedoCSourceContractTest {
         );
     }
 
+    @Test
+    void nativeReviewServicesShareOneOptimisticStatusTransition() throws Exception {
+        String header = Files.readString(root.resolve("tuxedo-server/include/cnaps_db.h"));
+        String db = Files.readString(root.resolve("tuxedo-server/src/common/db_helper.c"));
+        String review = Files.readString(root.resolve("tuxedo-server/src/services/cnaps_review.c"));
+
+        assertThat(header).contains("int db_review_voucher(const cnaps_voucher_row *row);");
+        assertThat(db).contains(
+            "int db_review_voucher",
+            "STATUS=:status, CHECKER_NO=:checker_no, CHECKER_TIME=SYSTIMESTAMP",
+            "LAST_ACTION=:last_action, LAST_OPERATOR_NO=:last_operator_no, LAST_REQUEST_ID=:last_request_id",
+            "LAST_ACTION_TIME=SYSTIMESTAMP, UPDATED_AT=SYSTIMESTAMP, VERSION_NO=NVL(VERSION_NO, 1) + 1",
+            "WHERE BILL_ID=:bill_id AND NVL(VERSION_NO, 1)=:version_no"
+        );
+        assertThat(review)
+            .contains(
+                "void CNAPS5702A", "void CNAPS5702R", "static void review_voucher",
+                "CNAPS_STATUS_APPROVED", "CNAPS_STATUS_REJECTED",
+                "REVIEW_PASS", "REVIEW_RETURN",
+                "cnaps_status_can_review(row.status)",
+                "db_review_voucher(&row)",
+                "cnaps_return_error(rqst, \"3004\", \"current status or version changed\")",
+                "put_review_summary"
+            )
+            .doesNotContain("CNAPS_STATUS_DRAFT", "00_DRAFT", "CNAPS_F_REVIEW_COMMENT", "CNAPS_F_REJECT_REASON");
+        assertThat(review.indexOf("db_find_voucher(bill_id, &row)"))
+            .isLessThan(review.indexOf("cnaps_status_can_review(row.status)"));
+        assertThat(review.indexOf("cnaps_status_can_review(row.status)"))
+            .isLessThan(review.indexOf("db_review_voucher(&row)"));
+        assertThat(review.indexOf("db_review_voucher(&row)"))
+            .isLessThan(review.lastIndexOf("db_find_voucher(bill_id, &row)"));
+        assertThat(review.lastIndexOf("db_find_voucher(bill_id, &row)"))
+            .isLessThan(review.indexOf("db_commit()"));
+    }
+
     private int countOccurrences(String value, String token) {
         return (value.length() - value.replace(token, "").length()) / token.length();
     }
